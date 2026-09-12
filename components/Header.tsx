@@ -1,23 +1,75 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+
+const links = [
+  { href: "/find-a-place", label: "Find a place" },
+  { href: "/#recommendations", label: "Recommended" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/contact", label: "Contact" }
+];
 
 export function Header() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
   return (
     <header className="site-header">
       <div className="container nav">
-        <Link href="/" className="brand-logo" aria-label="JDFortiHomes home">
+        <Link
+          href="/"
+          className="brand-lockup"
+          aria-label="JDFortiHomes home"
+          onClick={closeMenu}
+        >
           <img
-            src="/jdfortihomes-logo.svg"
-            alt="JDFortiHomes"
-            width={260}
-            height={48}
+            src="/jdfortihomes-mark.png"
+            alt=""
+            className="brand-mark"
+            width={1550}
+            height={793}
           />
+          <span className="brand-wordmark" aria-hidden="true">
+            <span>JDForti</span><span className="brand-wordmark-home">Homes</span>
+          </span>
         </Link>
 
         <nav className="nav-links" aria-label="Main navigation">
-          <Link href="/find-a-place">Find a place</Link>
-          <Link href="/#recommendations">Recommended</Link>
-          <Link href="/#how-it-works">How it works</Link>
-          <Link href="/contact">Contact</Link>
+          {links.map((link) => (
+            <Link key={link.href} href={link.href}>
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <button
+          type="button"
+          className="mobile-menu-button"
+          aria-expanded={menuOpen}
+          aria-controls="mobile-navigation"
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        id="mobile-navigation"
+        className={`mobile-nav ${menuOpen ? "open" : ""}`}
+      >
+        <nav className="container mobile-nav-links" aria-label="Mobile navigation">
+          {links.map((link) => (
+            <Link key={link.href} href={link.href} onClick={closeMenu}>
+              {link.label}
+            </Link>
+          ))}
         </nav>
       </div>
     </header>

@@ -6,7 +6,16 @@ export function Footer() {
     <footer className="footer">
       <div className="container footer-grid">
         <div>
-          <div className="brand">{siteConfig.shortName}<span>.</span></div>
+          <div className="footer-brand-lockup">
+            <img
+              src="/jdfortihomes-mark.png"
+              alt="JDFortiHomes"
+              className="footer-brand-mark"
+              width={1550}
+              height={793}
+            />
+            <div className="brand footer-brand"><span>JD</span>Forti<span className="footer-brand-home">Homes</span></div>
+          </div>
           <p>
             JDFortiHomes is an accommodation discovery and property-tour
             platform. Property availability and
