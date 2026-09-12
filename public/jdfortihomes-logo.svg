@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 96" role="img" aria-labelledby="title desc">
+  <title id="title">JDFortiHomes</title>
+  <desc id="desc">JDFortiHomes logo with a modern home mark.</desc>
+  <g transform="translate(4 8)">
+    <path d="M40 38 60 21l20 17v27H66V49H54v16H40Z" fill="#101214"/>
+    <path d="m35 39 25-22 25 22-5 5-20-17-20 17Z" fill="#c97925"/>
+  </g>
+  <text x="104" y="64" font-family="Manrope, Arial, Helvetica, sans-serif" font-size="54" font-weight="800" letter-spacing="-2.5" fill="#101214">JDFortiHomes</text>
+</svg>
