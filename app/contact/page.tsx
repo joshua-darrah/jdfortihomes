@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+export const metadata: Metadata = { title: "Contact JDFortiHomes", description: "Contact JDFortiHomes about accommodation enquiries, property tours, bookings, listings and privacy requests." };
+
+
 import { siteConfig } from "@/lib/site-config";
 
 export default function ContactPage() {

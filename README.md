@@ -185,3 +185,17 @@ Recommended platform campaign copy:
 - “See it before you decide. Book a guided property tour.”
 
 Do not describe a property as verified, available, affordable, luxury or discounted unless the relevant claim has been checked and can be supported.
+
+## Search engine visibility
+
+The site includes technical SEO for Google and other search engines:
+
+- page titles and descriptions;
+- canonical URLs;
+- Open Graph and Twitter preview metadata;
+- a branded favicon and Apple touch icon;
+- `robots.txt`;
+- a dynamic `sitemap.xml` containing public pages and currently published listings; and
+- Organization/WebSite structured data.
+
+Before launch, set `NEXT_PUBLIC_SITE_URL` to the exact public domain. After deployment, verify the domain in Google Search Console and submit the generated `/sitemap.xml`. Search engines decide when and where pages appear; SEO setup improves discoverability but cannot guarantee a ranking or immediate indexing.

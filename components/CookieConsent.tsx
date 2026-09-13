@@ -19,9 +19,8 @@ export function CookieConsent() {
       <div>
         <strong>Privacy and cookies</strong>
         <p>
-          JDFortiHomes currently uses only essential browser storage for site
-          functionality and your cookie preference. We do not currently run
-          advertising or analytics cookies.
+          JDFortiHomes uses essential browser storage for site functionality and your
+          privacy preference. We do not use advertising or behavioural-tracking cookies.
         </p>
         <Link href="/cookies">Read the cookies policy</Link>
       </div>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PropertyGallery } from "@/components/PropertyGallery";
@@ -5,10 +6,63 @@ import { formatGhs } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { demoListings } from "@/lib/demo-listings";
 import type { Listing } from "@/lib/types";
+import { getSiteUrl } from "@/lib/seo";
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params;
+  const listing = await getListing(id);
+
+  if (!listing || listing.status !== "published") {
+    return {
+      title: "Property not found",
+      robots: { index: false, follow: false }
+    };
+  }
+
+  const description =
+    listing.description ||
+    `View ${listing.title} in ${listing.location}, ${listing.city}, Ghana and request a guided property tour.`;
+  const image = listing.image_urls?.[0] || "/og-image.png";
+
+  return {
+    title: listing.title,
+    description,
+    alternates: {
+      canonical: `/listing/${listing.id}`
+    },
+    openGraph: {
+      type: "website",
+      title: `${listing.title} | JDFortiHomes`,
+      description,
+      url: `${getSiteUrl()}/listing/${listing.id}`,
+      images: [{ url: image, alt: listing.title }]
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${listing.title} | JDFortiHomes`,
+      description,
+      images: [image]
+    }
+  };
+}
 
 async function getListing(id: string): Promise<Listing | null> {
   if (!supabase) return demoListings.find((item) => item.id === id) || null;
-  const { data } = await supabase.from("listings").select("*").eq("id", id).maybeSingle();
+
+  const now = new Date().toISOString();
+  const { data } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("id", id)
+    .eq("status", "published")
+    .or(`visibility_starts_at.is.null,visibility_starts_at.lte.${now}`)
+    .or(`visibility_ends_at.is.null,visibility_ends_at.gt.${now}`)
+    .maybeSingle();
+
   return data as Listing | null;
 }
 

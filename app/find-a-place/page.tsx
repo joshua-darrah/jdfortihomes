@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
 import { RealtimeListings } from "@/components/RealtimeListings";
+export const metadata: Metadata = { title: "Find a place to rent in Ghana", description: "Browse accommodation in Ghana and compare properties by location, type, price, rooms and more." };
+
+
 import { supabase } from "@/lib/supabase";
 import type { Listing } from "@/lib/types";
 import { demoListings } from "@/lib/demo-listings";

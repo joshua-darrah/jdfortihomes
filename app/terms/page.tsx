@@ -1,108 +1,198 @@
+import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { siteConfig } from "@/lib/site-config";
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description:
+    "Read the JDFortiHomes terms for accommodation discovery and property-tour bookings."
+};
 
 export default function TermsPage() {
   return (
     <LegalPage
       eyebrow="Legal"
       title="Terms of Service"
-      intro={`Last updated: 11 September 2026. These terms govern your use of ${siteConfig.name}. They are written for the current accommodation-discovery and property-tour workflow and should be reviewed by Ghanaian legal counsel before commercial launch.`}
+      intro={`Last updated: 13 September 2026. These Terms of Service govern your use of ${siteConfig.name}, including property discovery, property-tour requests, bookings and related services.`}
     >
-      <h2>1. What JDFortiHomes does</h2>
+      <h2>1. About JDFortiHomes</h2>
       <p>
-        JDFortiHomes provides a platform for discovering accommodation listings
-        and requesting guided property tours. Unless a listing or separate written
-        agreement expressly says otherwise, JDFortiHomes is not the landlord,
-        property owner, tenant, estate agent or guarantor of a property shown on
-        the platform.
+        JDFortiHomes is an accommodation discovery and property-tour platform in
+        Ghana. The platform helps people find accommodation listings and request
+        guided visits to properties.
+      </p>
+      <p>
+        Unless a listing or separate written agreement expressly states otherwise,
+        JDFortiHomes is not the landlord, property owner, tenant, estate agent,
+        property manager or guarantor of a property displayed on the platform.
       </p>
 
-      <h2>2. Listing information</h2>
+      <h2>2. Using the platform</h2>
       <p>
-        Listings may be supplied by property representatives or administrators.
-        Information such as rent, availability, amenities, address, photographs,
-        videos and property descriptions can change. You must verify important
-        information during the tour and before making any rental payment or
-        entering a tenancy agreement. A listing or tour request is not a promise
-        that a property will remain available.
+        You must provide accurate information when making a booking or contacting
+        JDFortiHomes. You must use the platform lawfully and must not attempt to
+        access another person's account, booking, payment proof or personal
+        information.
+      </p>
+      <p>
+        Fraud, impersonation, harassment, abusive behaviour, unauthorised access,
+        misleading information and attempts to interfere with the operation or
+        security of the platform are prohibited.
       </p>
 
-      <h2>3. Tours and bookings</h2>
+      <h2>3. Property listings</h2>
       <p>
-        A booking is a request for a guided visit. It is not a tenancy agreement,
-        reservation of the property, transfer of ownership or guarantee that you
-        will obtain the property. A tour is only confirmed after JDFortiHomes or
-        the relevant property representative confirms it.
+        Property listings may contain information supplied by property owners,
+        representatives or JDFortiHomes administrators. Listings can include rent,
+        location, amenities, photographs, videos, availability and other details.
+      </p>
+      <p>
+        Property information can change. A listing on JDFortiHomes does not by
+        itself guarantee that the property is still available, that the stated price
+        remains unchanged, or that every description, photograph or amenity is
+        current. You should inspect the property and confirm important details before
+        entering a tenancy agreement or making rent, deposit or other property
+        payments.
       </p>
 
-      <h2>4. Payments</h2>
+      <h2>4. Sponsored listings and advertisements</h2>
       <p>
-        The current platform workflow may require a manual tour fee. Payment
-        instructions shown on the booking page must be checked carefully. Never
-        send a password, PIN, one-time authentication code or card security code.
-        A payment proof upload is evidence of a claimed payment; it does not by
-        itself mean that a payment has been verified or that a tour is confirmed.
+        Some property listings may be promoted through paid advertising or sponsored
+        placement on JDFortiHomes. Sponsored placement means that a property owner,
+        representative or advertiser has paid for promotional visibility; it does not
+        mean that JDFortiHomes guarantees the property, the advertiser, its price,
+        availability, condition or suitability.
+      </p>
+      <p>
+        Sponsored listings remain subject to the same platform requirements as other
+        published listings, including requirements relating to accurate information
+        and authorised property media.
       </p>
 
-      <h2>5. User responsibilities</h2>
+      <h2>5. Property tours and bookings</h2>
       <p>
-        You must provide accurate information, use the platform lawfully, avoid
-        fraudulent or abusive activity, and only upload payment evidence and other
-        content that you are authorised to provide. You must not attempt to access
-        another person's account, booking, files or personal information.
+        A booking is a request for a guided property visit. Submitting a booking does
+        not create a tenancy agreement, reserve a property, transfer ownership or
+        guarantee that you will obtain the property.
+      </p>
+      <p>
+        A tour becomes confirmed only when JDFortiHomes or the relevant property
+        representative confirms the appointment. JDFortiHomes may contact you using
+        the information provided in your booking to arrange, confirm, reschedule or
+        cancel a tour.
       </p>
 
-      <h2>6. Property and transaction decisions</h2>
+      <h2>6. Tour fees and payments</h2>
       <p>
-        You are responsible for inspecting a property, asking the questions needed
-        for your circumstances, checking the identity and authority of the person
-        offering the property, and reviewing any tenancy agreement before signing
-        or paying a landlord or other third party. JDFortiHomes does not guarantee
-        the condition, legality, ownership, availability or suitability of every
-        property listed.
+        JDFortiHomes may charge a tour fee for arranging a guided property visit.
+        The current fee is displayed during the booking process. The tour fee is
+        separate from rent, deposits, agency charges and other amounts charged by a
+        property owner or representative.
+      </p>
+      <p>
+        Payment instructions displayed by JDFortiHomes must be followed carefully.
+        A payment proof upload is evidence of a claimed payment and does not by itself
+        confirm that the payment has been received or that a tour has been confirmed.
+      </p>
+      <p>
+        JDFortiHomes will never ask you to provide a password, mobile-money PIN,
+        one-time authentication code, card PIN, CVV or other secret security
+        credential through the booking form or by email.
       </p>
 
-      <h2>7. Intellectual property</h2>
+      <h2>7. Property payments and tenancy decisions</h2>
       <p>
-        JDFortiHomes and its original software, branding, text and interface are
-        protected by applicable intellectual-property laws. Property media uploaded
-        by users or representatives remains subject to the rights of its respective
-        owner or licence holder. Do not upload media unless you have the necessary
-        rights or permission.
+        Rent, deposits, agency fees and other property-related payments are separate
+        from the JDFortiHomes tour fee unless JDFortiHomes expressly states otherwise.
+        Before paying a property owner or representative, you are responsible for
+        verifying the person's identity and authority, inspecting the property,
+        checking the agreed terms and reading the tenancy agreement carefully.
+      </p>
+      <p>
+        JDFortiHomes does not guarantee the ownership, legality, physical condition,
+        availability or suitability of every property listed on the platform.
       </p>
 
-      <h2>8. Suspension and termination</h2>
+      <h2>8. Payment evidence and uploaded content</h2>
       <p>
-        We may restrict or suspend access where reasonably necessary to protect the
-        platform, users, property representatives or personal data, including in
-        response to suspected fraud, abuse, security incidents or unlawful use.
+        You must only upload payment evidence, photographs, documents or other content
+        that you are authorised to provide. Do not upload unnecessary confidential
+        information or another person's personal information without a lawful reason.
+      </p>
+      <p>
+        JDFortiHomes may remove content or restrict access where content is unlawful,
+        misleading, infringing, abusive, fraudulent or harmful to the platform or its
+        users.
       </p>
 
-      <h2>9. Availability and liability</h2>
+      <h2>9. Intellectual property</h2>
       <p>
-        The platform is provided subject to reasonable availability and maintenance.
-        To the extent permitted by law, JDFortiHomes does not accept responsibility
-        for losses caused by inaccurate third-party listing information, a landlord
-        or property representative's conduct, a user's own decisions, payment made
-        outside the platform, or events beyond reasonable control. Nothing in these
-        terms excludes a liability that cannot lawfully be excluded in Ghana.
+        JDFortiHomes and its original software, branding, interface, text and other
+        original materials are protected by applicable intellectual-property laws.
+        You may use the platform for its intended accommodation-discovery purpose but
+        may not copy, reproduce, modify, distribute or commercially exploit JDFortiHomes
+        materials without permission.
+      </p>
+      <p>
+        Property photographs, videos, logos and other media remain subject to the
+        rights of their respective owners or licence holders.
       </p>
 
-      <h2>10. Changes</h2>
+      <h2>10. Suspension and termination</h2>
       <p>
-        We may update these terms when the service or law changes. The updated date
-        at the top of this page will show when the current version took effect.
+        JDFortiHomes may suspend or restrict access to the platform where necessary to
+        protect users, property representatives, personal information or the security
+        and operation of the service. This includes cases involving suspected fraud,
+        abuse, unlawful activity, unauthorised access or security threats.
       </p>
 
-      <h2>11. Governing law</h2>
+      <h2>11. Service availability and liability</h2>
       <p>
-        These terms are intended to operate under the laws of Ghana, subject to any
-        mandatory rights or remedies available to you under applicable law.
+        JDFortiHomes aims to keep the platform available and accurate, but temporary
+        interruptions may occur because of maintenance, network failures, hosting
+        issues, third-party services or events outside reasonable control.
+      </p>
+      <p>
+        To the extent permitted by law, JDFortiHomes is not responsible for losses
+        arising from inaccurate third-party listing information, the conduct of a
+        landlord or property representative, a user's decision to rent or pay for a
+        property, payments made outside the platform, or events beyond JDFortiHomes'
+        reasonable control. Nothing in these terms limits a right or liability that
+        cannot lawfully be limited or excluded.
       </p>
 
-      <h2>12. Contact</h2>
+      <h2>12. Complaints and disputes</h2>
       <p>
-        Questions about these terms can be sent to <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>.
+        If you have a complaint about a booking, property listing, tour or payment,
+        contact JDFortiHomes at the email address below with your booking reference
+        and relevant details. We will review the matter and communicate the outcome
+        using the contact information provided.
+      </p>
+      <p>
+        These terms do not prevent you from exercising any rights or remedies available
+        to you under applicable Ghanaian law.
+      </p>
+
+      <h2>13. Changes to these terms</h2>
+      <p>
+        JDFortiHomes may update these terms when the platform, services or applicable
+        requirements change. The date at the top of this page identifies the current
+        version. Continued use of the platform after an update constitutes acceptance
+        of the updated terms to the extent permitted by law.
+      </p>
+
+      <h2>14. Governing law</h2>
+      <p>
+        These terms are governed by the laws of the Republic of Ghana. Any dispute
+        relating to the use of JDFortiHomes will be handled through the appropriate
+        dispute-resolution process and courts with jurisdiction in Ghana, subject to
+        any mandatory legal rights available to the parties.
+      </p>
+
+      <h2>15. Contact</h2>
+      <p>
+        Questions, complaints or notices concerning these terms can be sent to{" "}
+        <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>.
       </p>
     </LegalPage>
   );

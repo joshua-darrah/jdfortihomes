@@ -1,114 +1,189 @@
+import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { siteConfig } from "@/lib/site-config";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description:
+    "Read how JDFortiHomes collects, uses, protects and retains personal information for property-tour bookings and support."
+};
 
 export default function PrivacyPage() {
   return (
     <LegalPage
       eyebrow="Privacy"
       title="Privacy Policy"
-      intro={`Last updated: 11 September 2026. This notice explains how ${siteConfig.name} handles the limited personal information needed to operate property-tour bookings and related support.`}
+      intro={`Last updated: 13 September 2026. This Privacy Policy explains how ${siteConfig.name} collects, uses, stores, shares and protects personal information when you use the platform.`}
     >
-      <h2>1. Who controls the information</h2>
+      <h2>1. Information covered by this policy</h2>
       <p>
-        JDFortiHomes is responsible for the personal information processed through
-        this platform and uses it only for the purposes described in this notice.
+        This policy applies to personal information submitted through JDFortiHomes,
+        including information provided when requesting a property tour, contacting
+        support or submitting a payment proof.
       </p>
 
       <h2>2. Information we collect</h2>
-      <p>For a tour booking, the platform currently collects only information needed to process the request:</p>
+      <p>For a property-tour booking, JDFortiHomes collects information such as:</p>
       <ul>
-        <li>full name;</li>
+        <li>your full name;</li>
         <li>phone number;</li>
         <li>email address;</li>
         <li>preferred tour date and time;</li>
-        <li>the selected property;</li>
+        <li>the property selected for the tour;</li>
         <li>payment method and payment proof supplied by you; and</li>
-        <li>optional additional information that you choose to include.</li>
+        <li>additional information you voluntarily provide in the booking form.</li>
       </ul>
       <p>
-        We do not ask for passwords, card PINs, authentication codes or other
-        unnecessary financial credentials. Please do not include them in forms or
-        uploaded files.
+        The platform does not request passwords, mobile-money PINs, one-time
+        authentication codes, card PINs or CVVs through the booking process. Do not
+        include these credentials in messages or uploaded documents.
       </p>
 
-      <h2>3. Why we use the information</h2>
+      <h2>3. How we use your information</h2>
       <ul>
-        <li>to receive and manage tour requests;</li>
-        <li>to communicate about a booking or property tour;</li>
-        <li>to review submitted payment evidence;</li>
-        <li>to prevent abuse and protect the security of the platform;</li>
-        <li>to keep necessary business and transaction records; and</li>
-        <li>to respond to support, privacy or legal requests.</li>
+        <li>to receive, process and manage property-tour requests;</li>
+        <li>to communicate about bookings, tours and property availability;</li>
+        <li>to verify submitted payment evidence;</li>
+        <li>to provide customer support and respond to complaints or requests;</li>
+        <li>to prevent fraud, abuse and unauthorised activity;</li>
+        <li>to maintain transaction, accounting and business records;</li>
+        <li>to maintain the security and reliability of the platform; and</li>
+        <li>to comply with applicable legal obligations and respond to lawful requests.</li>
       </ul>
 
-      <h2>4. Legal basis and consent</h2>
+      <h2>4. Lawful and fair processing</h2>
       <p>
-        We aim to process personal information lawfully, transparently and only to
-        the extent necessary for the stated purpose. Where consent is required, the
-        booking form asks for it before submission. You can contact us to ask about
-        withdrawal, correction or deletion where applicable. Some records may need
-        to be retained where required for a transaction, security, accounting or
-        legal purpose.
+        JDFortiHomes processes personal information for specific and legitimate
+        purposes, collects information that is relevant to those purposes, and takes
+        reasonable steps to keep information accurate and secure. Where consent is
+        used as the basis for a particular processing activity, the relevant form or
+        notice will request that consent.
       </p>
 
-      <h2>5. Sharing</h2>
+      <h2>5. Who receives your information</h2>
       <p>
-        We may share booking information with the property representative who needs
-        it to arrange the requested tour. We may also use infrastructure providers
-        such as Supabase to host the application's database, authentication and
-        file storage. We do not sell booking information or use it for advertising.
+        Booking information may be shared with the property owner or representative
+        responsible for arranging the requested tour. Access is limited to information
+        needed to provide the service.
+      </p>
+      <p>
+        JDFortiHomes also uses Supabase for application infrastructure, including
+        database, authentication and file storage. Information processed by a service
+        provider is handled for the purposes described in this policy and protected
+        through the security controls available within the platform.
+      </p>
+      <p>
+        JDFortiHomes does not sell customer booking information to third parties and
+        does not use booking information for behavioural advertising.
       </p>
 
       <h2>6. Payment proofs</h2>
       <p>
-        Uploaded payment proofs are stored in a private storage area and are intended
-        to be accessible only to authorised administrators. They should contain only
-        the information necessary to demonstrate the payment. Where possible, hide
-        unrelated account information before uploading a proof.
+        Payment proofs submitted through a booking are stored in private application
+        storage. They are accessible only to authorised administrators who need the
+        information to verify a booking or payment.
+      </p>
+      <p>
+        Payment proofs should contain only the information necessary to demonstrate the
+        payment. Customers should hide unrelated account details and never upload a
+        PIN, password, authentication code or other secret credential.
       </p>
 
-      <h2>7. Retention</h2>
+      <h2>7. How long we keep information</h2>
       <p>
-        We intend to keep personal information only for as long as reasonably needed
-        for the booking, support, security, accounting and legal purposes for which
-        it was collected. A specific retention schedule should be approved by the
-        operator before launch and applied to old bookings and payment proofs.
+        JDFortiHomes keeps personal information for the following periods:
+      </p>
+      <ul>
+        <li>
+          <strong>Completed bookings and payment records:</strong> six years from the
+          date of the relevant transaction.
+        </li>
+        <li>
+          <strong>Cancelled, rejected or unsuccessful booking requests:</strong> twelve
+          months from the last activity on the request.
+        </li>
+        <li>
+          <strong>Customer support correspondence:</strong> two years from the last
+          support activity, unless it forms part of a transaction or dispute record.
+        </li>
+        <li>
+          <strong>Security and administrative logs:</strong> up to twenty-four months
+          for security, fraud-prevention and audit purposes.
+        </li>
+      </ul>
+      <p>
+        Information is deleted or anonymised when the applicable retention period ends,
+        unless a longer period is required for an active dispute, legal obligation,
+        accounting or tax record, fraud investigation, security matter or enforcement
+        of a legal right.
       </p>
 
-      <h2>8. Your rights</h2>
+      <h2>8. Your privacy rights</h2>
       <p>
-        Subject to applicable Ghanaian law, you may ask us to explain our processing,
-        correct inaccurate information, object to certain processing, or request
-        deletion/destruction where we are no longer required to retain the data.
-        Send requests to <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>.
+        Subject to applicable Ghanaian law, you may request access to personal
+        information held about you, correction of inaccurate information, information
+        about how it is being used, or deletion/destruction where JDFortiHomes no
+        longer has a lawful reason to retain it. You may also raise an objection to
+        certain processing where the law gives you that right.
+      </p>
+      <p>
+        Send a privacy request to <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>.
+        JDFortiHomes may ask for enough information to verify the request before making
+        changes to personal information.
       </p>
 
       <h2>9. Security</h2>
       <p>
-        We use access controls and private storage for sensitive booking files and
-        limit collection to information needed for the service. No internet service
-        can guarantee absolute security, so users should also protect their own
-        devices and avoid submitting unnecessary confidential information.
+        JDFortiHomes uses reasonable technical and organisational safeguards for the
+        information handled through the platform. These include access controls,
+        authenticated administrator access, private storage for payment proofs and
+        limited collection of personal information.
       </p>
-
-      <h2>10. Third-party services and transfers</h2>
       <p>
-        The current application uses Supabase for authentication, database and
-        storage infrastructure. External services may process information in other
-        jurisdictions. JDFortiHomes should review the provider's current terms,
-        security documentation and applicable transfer requirements before launch.
+        No online service can guarantee absolute security. If JDFortiHomes becomes
+        aware of a personal-data incident requiring notification, it will handle the
+        incident and required notifications in accordance with applicable law.
       </p>
 
-      <h2>11. Ghana data protection compliance</h2>
+      <h2>10. International and third-party processing</h2>
       <p>
-        This policy is intended to reflect data-minimisation, purpose-limitation,
-        transparency and security principles under Ghana's Data Protection Act,
-        2012 (Act 843). JDFortiHomes should complete any registration, appointment,
-        documentation and compliance steps required by the Data Protection
-        Commission before processing personal data commercially. See the Data Protection Commission's current compliance guidance at <a href="https://dpc.gov.gh" target="_blank" rel="noreferrer">dpc.gov.gh</a>.
+        Some technology providers used by JDFortiHomes may process or store information
+        outside Ghana. Supabase provides the database, authentication and storage
+        infrastructure used by the application. JDFortiHomes uses appropriate access
+        controls and service configurations to protect information processed through
+        these services.
       </p>
 
-      <h2>12. Contact</h2>
+      <h2>11. Children</h2>
+      <p>
+        JDFortiHomes is intended for people who are legally able to enter into the
+        relevant accommodation or service arrangements. The platform does not
+        knowingly collect personal information from children for independent use of
+        the service.
+      </p>
+
+      <h2>12. Ghana data protection</h2>
+      <p>
+        JDFortiHomes handles personal information in accordance with the principles of
+        Ghana's Data Protection Act, 2012 (Act 843), including lawful processing,
+        purpose limitation, data minimisation, transparency, accuracy, security and
+        responsible retention.
+      </p>
+      <p>
+        Information about Ghana's data-protection framework is available from the{" "}
+        <a href="https://dpc.gov.gh" target="_blank" rel="noreferrer">
+          Data Protection Commission
+        </a>.
+      </p>
+
+      <h2>13. Changes to this policy</h2>
+      <p>
+        JDFortiHomes may update this policy when its services, technology or legal
+        requirements change. The date at the top of this page identifies the current
+        version.
+      </p>
+
+      <h2>14. Contact</h2>
       <p>
         Privacy questions and requests: <a href={`mailto:${siteConfig.email}`}>{siteConfig.email}</a>.
       </p>
