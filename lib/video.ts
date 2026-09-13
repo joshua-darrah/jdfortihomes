@@ -27,13 +27,24 @@ export function getVideoThumbnailUrl(url: string): string | null {
 export async function createVideoThumbnail(file: File): Promise<Blob | null> {
   if (typeof window === "undefined") return null;
 
+  return createVideoThumbnailFromUrl(URL.createObjectURL(file), true);
+}
+
+export async function createVideoThumbnailFromUrl(
+  url: string,
+  revokeObjectUrl = false
+): Promise<Blob | null> {
+  if (typeof window === "undefined") return null;
+
   return new Promise((resolve) => {
     const video = document.createElement("video");
-    const objectUrl = URL.createObjectURL(file);
     let settled = false;
+    let objectUrl = url;
 
     const cleanup = () => {
-      URL.revokeObjectURL(objectUrl);
+      if (revokeObjectUrl) URL.revokeObjectURL(objectUrl);
+      video.removeAttribute("src");
+      video.load();
       video.remove();
     };
 
@@ -44,14 +55,10 @@ export async function createVideoThumbnail(file: File): Promise<Blob | null> {
       resolve(value);
     };
 
-    video.preload = "metadata";
-    video.muted = true;
-    video.playsInline = true;
-    video.src = objectUrl;
-
     const capture = () => {
       const width = video.videoWidth;
       const height = video.videoHeight;
+
       if (!width || !height) {
         finish(null);
         return;
@@ -69,23 +76,42 @@ export async function createVideoThumbnail(file: File): Promise<Blob | null> {
         return;
       }
 
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => finish(blob), "image/jpeg", 0.86);
+      try {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => finish(blob), "image/jpeg", 0.86);
+      } catch {
+        finish(null);
+      }
     };
 
-    video.addEventListener("loadeddata", () => {
-      const targetTime = Number.isFinite(video.duration) && video.duration > 1
-        ? Math.min(1, video.duration / 3)
-        : 0;
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = "anonymous";
+    video.src = objectUrl;
 
-      if (targetTime > 0) {
-        video.currentTime = targetTime;
-      } else {
-        capture();
-      }
-    }, { once: true });
+    video.addEventListener(
+      "loadeddata",
+      () => {
+        const targetTime = Number.isFinite(video.duration) && video.duration > 1
+          ? Math.min(1, video.duration / 3)
+          : 0;
+
+        if (targetTime > 0) {
+          video.currentTime = targetTime;
+        } else {
+          capture();
+        }
+      },
+      { once: true }
+    );
 
     video.addEventListener("seeked", capture, { once: true });
     video.addEventListener("error", () => finish(null), { once: true });
+    video.addEventListener("stalled", () => {
+      window.setTimeout(() => {
+        if (!settled && video.readyState >= 2) capture();
+      }, 1200);
+    }, { once: true });
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import type { Ad, Agent, AgentPayout, Booking, Listing } from "@/lib/types";
 import { AD_PLACEMENTS } from "@/lib/ads";
@@ -503,6 +503,83 @@ function BookingDetails({ booking, onClose }: { booking: Booking; onClose: () =>
   );
 }
 
+function getAdStoragePath(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const marker = "/storage/v1/object/public/ad-media/";
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  return decodeURIComponent(url.slice(index + marker.length));
+}
+
+async function removeAdMedia(ad: Ad) {
+  if (!supabase || !ad.image_url) return;
+  const path = getAdStoragePath(ad.image_url);
+  if (!path) return;
+  const { error } = await supabase.storage.from("ad-media").remove([path]);
+  if (error) throw error;
+}
+
+function AdminEditorModal({
+  open,
+  title,
+  onClose,
+  children
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    closeButtonRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="modal admin-editor-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-editor-title"
+      >
+        <div className="modal-header">
+          <div>
+            <div className="eyebrow">Admin editor</div>
+            <h2 id="admin-editor-title">{title}</h2>
+          </div>
+          <button
+            ref={closeButtonRef}
+            className="button secondary small"
+            type="button"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+        {children}
+      </section>
+    </div>
+  );
+}
+
 function ListingPanel({
   listings,
   agents,
@@ -518,6 +595,23 @@ function ListingPanel({
   reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  function openNew() {
+    setEditing(null);
+    setEditorOpen(true);
+  }
+
+  function openListing(listing: Listing) {
+    setEditing(listing);
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setEditing(null);
+  }
+
   return (
     <div className="admin-grid">
       <div className="panel">
@@ -526,22 +620,49 @@ function ListingPanel({
             <h2>Property inventory</h2>
             <p className="location">Only publish properties and media that you are authorised to advertise.</p>
           </div>
+          <button className="button accent small" type="button" onClick={openNew}>
+            Add new listing
+          </button>
         </div>
         <div className="admin-list">
           {listings.map((listing) => (
-            <div className="admin-list-item" key={listing.id}>
+            <div
+              className="admin-list-item admin-clickable"
+              key={listing.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openListing(listing)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openListing(listing);
+                }
+              }}
+            >
               <div>
                 <strong>{listing.title}</strong>
-                <div className="location">{listing.location}, {listing.city} · {formatGhs(Number(listing.monthly_rent))}</div>
+                <div className="location">
+                  {listing.location}, {listing.city} · {formatGhs(Number(listing.monthly_rent))}
+                </div>
                 <div className="agent-ref">Agent: {listingAgentLabel(listing, agents)}</div>
                 <span className="status">{listing.status}</span>
               </div>
               <div className="admin-actions">
-                <button className="button secondary small" type="button" onClick={() => setEditing(listing)}>Edit</button>
+                <button
+                  className="button secondary small"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openListing(listing);
+                  }}
+                >
+                  Edit
+                </button>
                 <button
                   className="button danger small"
                   type="button"
-                  onClick={async () => {
+                  onClick={async (event) => {
+                    event.stopPropagation();
                     if (!window.confirm(`Delete ${listing.title}? This cannot be undone.`)) return;
                     const { error } = await supabase!.from("listings").delete().eq("id", listing.id);
                     setMessage(error ? error.message : "Listing deleted.");
@@ -557,17 +678,24 @@ function ListingPanel({
         {!listings.length ? <div className="empty">No listings have been created.</div> : null}
       </div>
 
-      <ListingEditor
-        listing={editing}
-        agents={agents}
-        onSaved={async (msg) => {
-          setMessage(msg);
-          setEditing(null);
-          await reload();
-        }}
-        onCancel={() => setEditing(null)}
-        onMessage={setMessage}
-      />
+      <AdminEditorModal
+        open={editorOpen}
+        title={editing ? "Edit listing" : "Add new listing"}
+        onClose={closeEditor}
+      >
+        <ListingEditor
+          key={editing?.id || "new-listing"}
+          listing={editing}
+          agents={agents}
+          onSaved={async (msg) => {
+            setMessage(msg);
+            closeEditor();
+            await reload();
+          }}
+          onCancel={closeEditor}
+          onMessage={setMessage}
+        />
+      </AdminEditorModal>
     </div>
   );
 }
@@ -828,6 +956,7 @@ function AdPanel({
   reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
+  const [editorOpen, setEditorOpen] = useState(false);
   const now = Date.now();
 
   function displayState(ad: Ad) {
@@ -838,17 +967,103 @@ function AdPanel({
     return "Live";
   }
 
+  function openNew() {
+    setEditing(null);
+    setEditorOpen(true);
+  }
+
+  function openAd(ad: Ad) {
+    setEditing(ad);
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setEditing(null);
+  }
+
   async function removeAd(ad: Ad) {
-    if (!window.confirm(`Delete ${ad.title}? The campaign will be removed. A sponsored property will remain available as a normal listing.`)) return;
+    if (!window.confirm(`Delete ${ad.title}? This will permanently remove the advertisement from the database and website.`)) return;
+
     if (ad.listing_id) {
-      await supabase!.from("listings").update({
+      const { error: listingError } = await supabase!.from("listings").update({
         is_sponsored: false,
         visibility_starts_at: null,
         visibility_ends_at: null
       }).eq("id", ad.listing_id);
+
+      if (listingError) {
+        setMessage(`Could not clear the sponsored property: ${listingError.message}`);
+        return;
+      }
     }
+
+    try {
+      await removeAdMedia(ad);
+    } catch (error) {
+      setMessage(`Could not remove advertisement media: ${error instanceof Error ? error.message : "Storage error"}`);
+      return;
+    }
+
     const { error } = await supabase!.from("ads").delete().eq("id", ad.id);
-    setMessage(error ? error.message : "Advertisement deleted.");
+    if (error) {
+      setMessage(`Could not delete advertisement: ${error.message}`);
+      return;
+    }
+
+    closeEditor();
+    setMessage("Advertisement permanently deleted from the database and website.");
+    await reload();
+  }
+
+  async function clearAllAds() {
+    if (!ads.length) {
+      setMessage("There are no advertisements to clear.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Clear all ${ads.length} advertisements? This will permanently delete every advertisement from the database and remove all active sponsored-property promotion from the website. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const sponsoredListingIds = ads
+      .map((ad) => ad.listing_id)
+      .filter((id): id is string => Boolean(id));
+
+    if (sponsoredListingIds.length) {
+      const { error: listingError } = await supabase!
+        .from("listings")
+        .update({
+          is_sponsored: false,
+          visibility_starts_at: null,
+          visibility_ends_at: null
+        })
+        .in("id", sponsoredListingIds);
+
+      if (listingError) {
+        setMessage(`Could not clear sponsored-property visibility: ${listingError.message}`);
+        return;
+      }
+    }
+
+    try {
+      for (const ad of ads) {
+        await removeAdMedia(ad);
+      }
+    } catch (error) {
+      setMessage(`Could not remove advertisement media: ${error instanceof Error ? error.message : "Storage error"}`);
+      return;
+    }
+
+    const { error } = await supabase!.from("ads").delete().not("id", "is", null);
+    if (error) {
+      setMessage(`Could not clear advertisements: ${error.message}`);
+      return;
+    }
+
+    closeEditor();
+    setMessage("All advertisements have been permanently deleted from the database and website.");
     await reload();
   }
 
@@ -867,10 +1082,30 @@ function AdPanel({
             <h2>Advertisements</h2>
             <p className="location">Create promotional placements and control exactly when they appear on the public website.</p>
           </div>
+          <div className="admin-actions">
+            <button className="button accent small" type="button" onClick={openNew}>
+              Add new advertisement
+            </button>
+            <button className="button danger small" type="button" onClick={() => void clearAllAds()} disabled={!ads.length}>
+              Clear all advertisements
+            </button>
+          </div>
         </div>
         <div className="admin-list">
           {ads.map((ad) => (
-            <div className="admin-list-item" key={ad.id}>
+            <div
+              className="admin-list-item admin-clickable"
+              key={ad.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openAd(ad)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openAd(ad);
+                }
+              }}
+            >
               <div>
                 <strong>{ad.title}</strong>
                 <div className="location">{ad.ad_type === "sponsored_property" ? "Sponsored property" : "JDFortiHomes promotion"}</div>
@@ -882,11 +1117,36 @@ function AdPanel({
                 <span className="status">{displayState(ad)}</span>
               </div>
               <div className="admin-actions">
-                <button className="button secondary small" type="button" onClick={() => setEditing(ad)}>Edit</button>
-                <button className="button secondary small" type="button" onClick={() => void toggleAd(ad)}>
+                <button
+                  className="button secondary small"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openAd(ad);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  className="button secondary small"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void toggleAd(ad);
+                  }}
+                >
                   {ad.status === "active" ? "Pause" : "Activate"}
                 </button>
-                <button className="button danger small" type="button" onClick={() => void removeAd(ad)}>Delete</button>
+                <button
+                  className="button danger small"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void removeAd(ad);
+                  }}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
@@ -898,18 +1158,25 @@ function AdPanel({
         </div>
       </div>
 
-      <AdEditor
-        ad={editing}
-        listings={listings}
-        agents={agents}
-        onSaved={async (msg) => {
-          setMessage(msg);
-          setEditing(null);
-          await reload();
-        }}
-        onCancel={() => setEditing(null)}
-        onMessage={setMessage}
-      />
+      <AdminEditorModal
+        open={editorOpen}
+        title={editing ? "Edit advertisement" : "Add new advertisement"}
+        onClose={closeEditor}
+      >
+        <AdEditor
+          key={editing?.id || "new-advertisement"}
+          ad={editing}
+          listings={listings}
+          agents={agents}
+          onSaved={async (msg) => {
+            setMessage(msg);
+            closeEditor();
+            await reload();
+          }}
+          onCancel={closeEditor}
+          onMessage={setMessage}
+        />
+      </AdminEditorModal>
     </div>
   );
 }
@@ -1226,6 +1493,7 @@ function AgentPanel({
   setMessage: (value: string) => void;
 }) {
   const [editing, setEditing] = useState<Agent | null>(null);
+  const [agentEditorOpen, setAgentEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(agents[0]?.id || "");
 
@@ -1268,6 +1536,7 @@ function AgentPanel({
 
     setSaving(false);
     setMessage(editing ? "Agent updated." : "Agent added.");
+    setAgentEditorOpen(false);
     setEditing(null);
     await reload();
   }
@@ -1305,30 +1574,49 @@ function AgentPanel({
     <div className="admin-grid">
       <div>
         <div className="panel">
-          <div className="panel-heading"><div><h2>Agents</h2><p className="location">Keep a private record of agents who source or submit properties and campaigns.</p></div><button className="button accent small" type="button" onClick={() => setEditing(null)}>New agent</button></div>
+          <div className="panel-heading"><div><h2>Agents</h2><p className="location">Keep a private record of agents who source or submit properties and campaigns.</p></div><button className="button accent small" type="button" onClick={() => { setEditing(null); setAgentEditorOpen(true); }}>Add new agent</button></div>
           <div className="admin-list">
             {agents.map((agent) => (
-              <div className="admin-list-item" key={agent.id}>
+              <div
+                className="admin-list-item admin-clickable"
+                key={agent.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => { setEditing(agent); setAgentEditorOpen(true); }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setEditing(agent);
+                    setAgentEditorOpen(true);
+                  }
+                }}
+              >
                 <div><strong>{agent.agent_code}</strong><div>{agent.full_name}</div><div className="location">{agent.phone || agent.email || "No contact details"} · {agent.status}</div><div className="agent-ref">Account: {agent.user_id ? "Linked" : "Not linked"}</div></div>
-                <div className="admin-actions"><button className="button secondary small" type="button" onClick={() => setEditing(agent)}>Edit</button><button className="button secondary small" type="button" onClick={() => setSelectedAgent(agent.id)}>View payouts</button></div>
+                <div className="admin-actions"><button className="button secondary small" type="button" onClick={(event) => { event.stopPropagation(); setEditing(agent); setAgentEditorOpen(true); }}>Edit</button><button className="button secondary small" type="button" onClick={(event) => { event.stopPropagation(); setSelectedAgent(agent.id); }}>View payouts</button></div>
               </div>
             ))}
           </div>
           {!agents.length ? <div className="empty">No agents have been added yet.</div> : null}
         </div>
 
-        <form className="panel" onSubmit={saveAgent} style={{ marginTop: 20 }}>
-          <h2>{editing ? "Edit agent" : "Add agent"}</h2>
-          <div className="form-grid" style={{ marginTop: 12 }}>
-            <div className="form-group"><label htmlFor="agent-code">Agent ID *</label><input className="field" id="agent-code" name="agent_code" defaultValue={editing?.agent_code || ""} placeholder="AG-001" maxLength={40} required /></div>
-            <div className="form-group"><label htmlFor="agent-name">Full name *</label><input className="field" id="agent-name" name="full_name" defaultValue={editing?.full_name || ""} maxLength={120} required /></div>
-            <div className="form-group"><label htmlFor="agent-phone">Phone</label><input className="field" id="agent-phone" name="phone" defaultValue={editing?.phone || ""} maxLength={40} /></div>
-            <div className="form-group"><label htmlFor="agent-email">Email</label><input className="field" id="agent-email" name="email" type="email" defaultValue={editing?.email || ""} maxLength={160} /></div>
-            <div className="form-group"><label htmlFor="agent-status">Status</label><select className="field" id="agent-status" name="status" defaultValue={editing?.status || "active"}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-          </div>
-          <div className="form-group"><label htmlFor="agent-user-id">Supabase Auth user ID</label><input className="field" id="agent-user-id" name="user_id" defaultValue={editing?.user_id || ""} placeholder="Optional — link the agent login account" /><span className="upload-note">Create the user in Supabase Authentication first, then paste their user ID here.</span></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-notes">Internal notes</label><textarea className="field" id="agent-notes" name="notes" defaultValue={editing?.notes || ""} maxLength={1000} /></div>
-          <div className="admin-actions" style={{ marginTop: 16 }}><button className="button accent" type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Save agent" : "Add agent"}</button>{editing ? <button className="button secondary" type="button" onClick={() => setEditing(null)}>Cancel</button> : null}</div>
-        </form>
+        <AdminEditorModal
+          open={agentEditorOpen}
+          title={editing ? "Edit agent" : "Add new agent"}
+          onClose={() => { setAgentEditorOpen(false); setEditing(null); }}
+        >
+          <form key={editing?.id || "new-agent"} onSubmit={saveAgent}>
+            <div className="form-grid" style={{ marginTop: 12 }}>
+              <div className="form-group"><label htmlFor="agent-code">Agent ID *</label><input className="field" id="agent-code" name="agent_code" defaultValue={editing?.agent_code || ""} placeholder="AG-001" maxLength={40} required /></div>
+              <div className="form-group"><label htmlFor="agent-name">Full name *</label><input className="field" id="agent-name" name="full_name" defaultValue={editing?.full_name || ""} maxLength={120} required /></div>
+              <div className="form-group"><label htmlFor="agent-phone">Phone</label><input className="field" id="agent-phone" name="phone" defaultValue={editing?.phone || ""} maxLength={40} /></div>
+              <div className="form-group"><label htmlFor="agent-email">Email</label><input className="field" id="agent-email" name="email" type="email" defaultValue={editing?.email || ""} maxLength={160} /></div>
+              <div className="form-group"><label htmlFor="agent-status">Status</label><select className="field" id="agent-status" name="status" defaultValue={editing?.status || "active"}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+            </div>
+            <div className="form-group"><label htmlFor="agent-user-id">Supabase Auth user ID</label><input className="field" id="agent-user-id" name="user_id" defaultValue={editing?.user_id || ""} placeholder="Optional — link the agent login account" /><span className="upload-note">Create the user in Supabase Authentication first, then paste their user ID here.</span></div>
+            <div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-notes">Internal notes</label><textarea className="field" id="agent-notes" name="notes" defaultValue={editing?.notes || ""} maxLength={1000} /></div>
+            <div className="admin-actions" style={{ marginTop: 16 }}><button className="button accent" type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Save agent" : "Add agent"}</button><button className="button secondary" type="button" onClick={() => { setAgentEditorOpen(false); setEditing(null); }}>Cancel</button></div>
+          </form>
+        </AdminEditorModal>
       </div>
 
       <div className="panel">
