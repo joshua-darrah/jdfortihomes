@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Listing } from "@/lib/types";
 import { formatGhs } from "@/lib/utils";
+import { ShareListingButton } from "@/components/ShareListingButton";
 
 export function ListingCard({ listing }: { listing: Listing }) {
   const image = listing.image_urls?.[0];
@@ -28,7 +29,10 @@ export function ListingCard({ listing }: { listing: Listing }) {
         </div>
         <div className="card-footer">
           <span className="location">{listing.furnishing}</span>
-          <Link className="button small" href={`/listing/${listing.id}`}>View property</Link>
+          <div className="listing-card-actions">
+            <Link className="button small" href={`/listing/${listing.id}`}>View property</Link>
+            <ShareListingButton listing={listing} />
+          </div>
         </div>
       </div>
     </article>

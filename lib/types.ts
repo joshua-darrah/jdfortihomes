@@ -30,6 +30,7 @@ export type Listing = {
   is_sponsored: boolean;
   visibility_starts_at: string | null;
   visibility_ends_at: string | null;
+  agent_id?: string | null;
 };
 
 export type Booking = {
@@ -74,4 +75,34 @@ export type Ad = {
   ends_at: string;
   created_at: string;
   updated_at: string;
+  agent_id?: string | null;
+};
+
+
+export type Agent = {
+  id: string;
+  agent_code: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentPayout = {
+  id: string;
+  agent_id: string;
+  listing_id: string | null;
+  ad_id: string | null;
+  amount: number;
+  currency: string;
+  status: "pending" | "approved" | "paid" | "cancelled";
+  reference: string | null;
+  notes: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+  agent?: Pick<Agent, "agent_code" | "full_name">;
 };

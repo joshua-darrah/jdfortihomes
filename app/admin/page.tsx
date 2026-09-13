@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
-import type { Ad, Booking, Listing } from "@/lib/types";
+import type { Ad, Agent, AgentPayout, Booking, Listing } from "@/lib/types";
 import { AD_PLACEMENTS } from "@/lib/ads";
 import { formatGhs } from "@/lib/utils";
 import { AdminSkeleton } from "@/components/Skeletons";
@@ -18,10 +18,12 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState<"bookings" | "listings" | "ads">("bookings");
+  const [tab, setTab] = useState<"bookings" | "listings" | "ads" | "agents">("bookings");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentPayouts, setAgentPayouts] = useState<AgentPayout[]>([]);
   const [editingAd, setEditingAd] = useState<Ad | null>(null);
   const [editing, setEditing] = useState<Listing | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -100,21 +102,37 @@ export default function AdminPage() {
     if (!supabase || role !== "admin") return;
     setDataLoading(true);
 
-    const [listingResult, bookingResult, adResult] = await Promise.all([
+    const [listingResult, bookingResult, adResult, agentResult, payoutResult, listingAgentResult, adAgentResult] = await Promise.all([
       supabase.from("listings").select("*").order("created_at", { ascending: false }),
       supabase
         .from("bookings")
         .select("*, listing:listings(title, location, city)")
         .order("created_at", { ascending: false }),
-      supabase.from("ads").select("*").order("created_at", { ascending: false })
+      supabase.from("ads").select("*").order("created_at", { ascending: false }),
+      supabase.from("agents").select("*").order("created_at", { ascending: false }),
+      supabase.from("agent_payouts").select("*, agent:agents(agent_code, full_name)").order("created_at", { ascending: false }),
+      supabase.from("listing_agents").select("listing_id, agent_id"),
+      supabase.from("ad_agents").select("ad_id, agent_id")
     ]);
 
     if (listingResult.error) setMessage(listingResult.error.message);
     if (bookingResult.error) setMessage(bookingResult.error.message);
     if (adResult.error) setMessage(adResult.error.message);
-    if (listingResult.data) setListings(listingResult.data as Listing[]);
+    if (agentResult.error) setMessage(agentResult.error.message);
+    if (payoutResult.error) setMessage(payoutResult.error.message);
+    if (listingAgentResult.error) setMessage(listingAgentResult.error.message);
+    if (adAgentResult.error) setMessage(adAgentResult.error.message);
+    if (listingResult.data) {
+      const agentMap = new Map((listingAgentResult.data || []).map((row: any) => [row.listing_id, row.agent_id]));
+      setListings((listingResult.data as Listing[]).map((item) => ({ ...item, agent_id: agentMap.get(item.id) || null })) as Listing[]);
+    }
     if (bookingResult.data) setBookings(bookingResult.data as Booking[]);
-    if (adResult.data) setAds(adResult.data as Ad[]);
+    if (adResult.data) {
+      const agentMap = new Map((adAgentResult.data || []).map((row: any) => [row.ad_id, row.agent_id]));
+      setAds((adResult.data as Ad[]).map((item) => ({ ...item, agent_id: agentMap.get(item.id) || null })) as Ad[]);
+    }
+    if (agentResult.data) setAgents(agentResult.data as Agent[]);
+    if (payoutResult.data) setAgentPayouts(payoutResult.data as AgentPayout[]);
     setDataLoading(false);
   }
 
@@ -205,6 +223,7 @@ export default function AdminPage() {
           <button className={`tab ${tab === "ads" ? "active" : ""}`} type="button" role="tab" aria-selected={tab === "ads"} onClick={() => setTab("ads")}>
             Advertisements ({ads.length})
           </button>
+          <button className={`tab ${tab === "agents" ? "active" : ""}`} type="button" role="tab" aria-selected={tab === "agents"} onClick={() => setTab("agents")}>Agents ({agents.length})</button>
           <button className="tab" type="button" onClick={() => exportBookings(bookings)}>Export bookings CSV</button>
         </div>
 
@@ -225,6 +244,7 @@ export default function AdminPage() {
         {!dataLoading && tab === "listings" ? (
           <ListingPanel
             listings={listings}
+            agents={agents}
             editing={editing}
             setEditing={setEditing}
             reload={loadData}
@@ -236,8 +256,20 @@ export default function AdminPage() {
           <AdPanel
             ads={ads}
             listings={listings}
+            agents={agents}
             editing={editingAd}
             setEditing={setEditingAd}
+            reload={loadData}
+            setMessage={setMessage}
+          />
+        ) : null}
+
+        {!dataLoading && tab === "agents" ? (
+          <AgentPanel
+            agents={agents}
+            payouts={agentPayouts}
+            listings={listings}
+            ads={ads}
             reload={loadData}
             setMessage={setMessage}
           />
@@ -472,12 +504,14 @@ function BookingDetails({ booking, onClose }: { booking: Booking; onClose: () =>
 
 function ListingPanel({
   listings,
+  agents,
   editing,
   setEditing,
   reload,
   setMessage
 }: {
   listings: Listing[];
+  agents: Agent[];
   editing: Listing | null;
   setEditing: (value: Listing | null) => void;
   reload: () => Promise<void>;
@@ -498,6 +532,7 @@ function ListingPanel({
               <div>
                 <strong>{listing.title}</strong>
                 <div className="location">{listing.location}, {listing.city} · {formatGhs(Number(listing.monthly_rent))}</div>
+                <div className="agent-ref">Agent: {listingAgentLabel(listing, agents)}</div>
                 <span className="status">{listing.status}</span>
               </div>
               <div className="admin-actions">
@@ -523,6 +558,7 @@ function ListingPanel({
 
       <ListingEditor
         listing={editing}
+        agents={agents}
         onSaved={async (msg) => {
           setMessage(msg);
           setEditing(null);
@@ -537,11 +573,13 @@ function ListingPanel({
 
 function ListingEditor({
   listing,
+  agents,
   onSaved,
   onCancel,
   onMessage
 }: {
   listing: Listing | null;
+  agents: Agent[];
   onSaved: (message: string) => Promise<void>;
   onCancel: () => void;
   onMessage: (message: string) => void;
@@ -624,6 +662,7 @@ function ListingEditor({
         status,
         is_demo: form.get("is_demo") === "on"
       };
+      const agentId = String(form.get("agent_id") || "").trim() || null;
 
       let id = listing?.id;
       if (listing) {
@@ -639,6 +678,13 @@ function ListingEditor({
       const videoInput = formElement.elements.namedItem("video_files") as HTMLInputElement | null;
       const uploadedImages = await uploadFiles(id!, photoInput?.files || null, "image");
       const uploadedVideos = await uploadFiles(id!, videoInput?.files || null, "video");
+
+      if (agentId) {
+        const { error } = await supabase.from("listing_agents").upsert({ listing_id: id!, agent_id: agentId });
+        if (error) throw error;
+      } else {
+        await supabase.from("listing_agents").delete().eq("listing_id", id!);
+      }
 
       if (uploadedImages.length || uploadedVideos.length) {
         const { error } = await supabase.from("listings").update({
@@ -709,6 +755,14 @@ function ListingEditor({
       </div>
 
       <div className="form-grid" style={{ marginTop: 12 }}>
+        <div className="form-group">
+          <label htmlFor="listing-agent">Source agent</label>
+          <select className="field" id="listing-agent" name="agent_id" defaultValue={(listing as Listing & { agent_id?: string | null })?.agent_id || ""}>
+            <option value="">No agent assigned</option>
+            {agents.filter((agent) => agent.status === "active").map((agent) => <option key={agent.id} value={agent.id}>{agent.agent_code} — {agent.full_name}</option>)}
+          </select>
+          <span className="upload-note">Internal only. This is never shown on the public property page.</span>
+        </div>
         <div className="form-group"><label htmlFor="listing-status">Status</label><select className="field" id="listing-status" name="status" defaultValue={listing?.status || "draft"}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></div>
         <label className="checkbox-label admin-check"><input type="checkbox" name="is_demo" defaultChecked={listing?.is_demo || false} /><span>Mark as demo listing</span></label>
       </div>
@@ -730,6 +784,7 @@ function ListingEditor({
 function AdPanel({
   ads,
   listings,
+  agents,
   editing,
   setEditing,
   reload,
@@ -737,6 +792,7 @@ function AdPanel({
 }: {
   ads: Ad[];
   listings: Listing[];
+  agents: Agent[];
   editing: Ad | null;
   setEditing: (value: Ad | null) => void;
   reload: () => Promise<void>;
@@ -788,6 +844,7 @@ function AdPanel({
               <div>
                 <strong>{ad.title}</strong>
                 <div className="location">{ad.ad_type === "sponsored_property" ? "Sponsored property" : "JDFortiHomes promotion"}</div>
+                <div className="agent-ref">Agent: {adAgentLabel(ad, agents)}</div>
                 <div className="location">{AD_PLACEMENTS[ad.placement as keyof typeof AD_PLACEMENTS] || ad.placement}</div>
                 <div className="location">
                   {new Date(ad.starts_at).toLocaleString("en-GH")} → {new Date(ad.ends_at).toLocaleString("en-GH")}
@@ -814,6 +871,7 @@ function AdPanel({
       <AdEditor
         ad={editing}
         listings={listings}
+        agents={agents}
         onSaved={async (msg) => {
           setMessage(msg);
           setEditing(null);
@@ -829,12 +887,14 @@ function AdPanel({
 function AdEditor({
   ad,
   listings,
+  agents,
   onSaved,
   onCancel,
   onMessage
 }: {
   ad: Ad | null;
   listings: Listing[];
+  agents: Agent[];
   onSaved: (message: string) => Promise<void>;
   onCancel: () => void;
   onMessage: (message: string) => void;
@@ -862,6 +922,7 @@ function AdEditor({
       const duration = Number(form.get("duration"));
       const durationUnit = String(form.get("duration_unit") || "days");
       const status = String(form.get("status") || "draft");
+      const agentId = String(form.get("agent_id") || "").trim() || null;
 
       if (!title || !startsAtValue || !Number.isFinite(duration) || duration <= 0) {
         throw new Error("Enter a title, start date/time and a duration greater than zero.");
@@ -951,6 +1012,13 @@ function AdEditor({
         if (error) throw error;
       }
 
+      if (id && agentId) {
+        const { error } = await supabase.from("ad_agents").upsert({ ad_id: id, agent_id: agentId });
+        if (error) throw error;
+      } else if (id) {
+        await supabase.from("ad_agents").delete().eq("ad_id", id);
+      }
+
       if (id && adType === "platform_promotion" && ad?.listing_id) {
         await supabase.from("listings").update({
           is_sponsored: false,
@@ -1010,6 +1078,15 @@ function AdEditor({
           ))}
         </select>
         <span className="upload-note">Required only for Sponsored property. The selected property will automatically stop appearing when this campaign ends.</span>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="ad-agent">Source agent</label>
+        <select className="field" id="ad-agent" name="agent_id" defaultValue={(ad as Ad & { agent_id?: string | null })?.agent_id || ""}>
+          <option value="">No agent assigned</option>
+          {agents.filter((agent) => agent.status === "active").map((agent) => <option key={agent.id} value={agent.id}>{agent.agent_code} — {agent.full_name}</option>)}
+        </select>
+        <span className="upload-note">Internal only. This is never shown in the public advertisement.</span>
       </div>
 
       <div className="form-group">
@@ -1092,6 +1169,143 @@ function AdEditor({
         {ad ? <button className="button secondary" type="button" onClick={onCancel}>Cancel editing</button> : null}
       </div>
     </form>
+  );
+}
+
+function listingAgentLabel(listing: Listing, agents: Agent[]) {
+  return agents.find((agent) => agent.id === (listing as Listing & { agent_id?: string }).agent_id)?.agent_code || "Unassigned";
+}
+
+function adAgentLabel(ad: Ad, agents: Agent[]) {
+  return agents.find((agent) => agent.id === (ad as Ad & { agent_id?: string }).agent_id)?.agent_code || "Unassigned";
+}
+
+function AgentPanel({
+  agents,
+  payouts,
+  listings,
+  ads,
+  reload,
+  setMessage
+}: {
+  agents: Agent[];
+  payouts: AgentPayout[];
+  listings: Listing[];
+  ads: Ad[];
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState<Agent | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState(agents[0]?.id || "");
+
+  async function saveAgent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      agent_code: String(form.get("agent_code") || "").trim().toUpperCase(),
+      full_name: String(form.get("full_name") || "").trim(),
+      phone: String(form.get("phone") || "").trim() || null,
+      email: String(form.get("email") || "").trim() || null,
+      notes: String(form.get("notes") || "").trim() || null,
+      status: String(form.get("status") || "active")
+    };
+    if (!payload.agent_code || !payload.full_name) { setMessage("Agent ID and name are required."); return; }
+    setSaving(true);
+    const result = editing
+      ? await supabase.from("agents").update(payload).eq("id", editing.id)
+      : await supabase.from("agents").insert(payload);
+    setSaving(false);
+    if (result.error) { setMessage(result.error.message); return; }
+    setMessage(editing ? "Agent updated." : "Agent added.");
+    setEditing(null);
+    await reload();
+  }
+
+  async function updatePayout(id: string, status: string) {
+    if (!supabase) return;
+    const payload: Record<string, unknown> = { status };
+    if (status === "paid") payload.paid_at = new Date().toISOString();
+    const { error } = await supabase.from("agent_payouts").update(payload).eq("id", id);
+    setMessage(error ? error.message : "Agent payout updated.");
+    await reload();
+  }
+
+  async function createPayout(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    const form = new FormData(event.currentTarget);
+    const agentId = String(form.get("agent_id") || "");
+    const amount = Number(form.get("amount") || 0);
+    if (!agentId || !Number.isFinite(amount) || amount < 0) { setMessage("Select an agent and enter a valid amount."); return; }
+    const { error } = await supabase.from("agent_payouts").insert({
+      agent_id: agentId,
+      listing_id: String(form.get("listing_id") || "") || null,
+      ad_id: String(form.get("ad_id") || "") || null,
+      amount,
+      currency: "GHS",
+      status: "pending",
+      reference: String(form.get("reference") || "").trim() || null,
+      notes: String(form.get("notes") || "").trim() || null
+    });
+    if (error) setMessage(error.message); else { setMessage("Agent payout recorded as pending."); event.currentTarget.reset(); await reload(); }
+  }
+
+  return (
+    <div className="admin-grid">
+      <div>
+        <div className="panel">
+          <div className="panel-heading"><div><h2>Agents</h2><p className="location">Keep a private record of agents who source or submit properties and campaigns.</p></div><button className="button accent small" type="button" onClick={() => setEditing(null)}>New agent</button></div>
+          <div className="admin-list">
+            {agents.map((agent) => (
+              <div className="admin-list-item" key={agent.id}>
+                <div><strong>{agent.agent_code}</strong><div>{agent.full_name}</div><div className="location">{agent.phone || agent.email || "No contact details"} · {agent.status}</div></div>
+                <div className="admin-actions"><button className="button secondary small" type="button" onClick={() => setEditing(agent)}>Edit</button><button className="button secondary small" type="button" onClick={() => setSelectedAgent(agent.id)}>View payouts</button></div>
+              </div>
+            ))}
+          </div>
+          {!agents.length ? <div className="empty">No agents have been added yet.</div> : null}
+        </div>
+
+        <form className="panel" onSubmit={saveAgent} style={{ marginTop: 20 }}>
+          <h2>{editing ? "Edit agent" : "Add agent"}</h2>
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <div className="form-group"><label htmlFor="agent-code">Agent ID *</label><input className="field" id="agent-code" name="agent_code" defaultValue={editing?.agent_code || ""} placeholder="AG-001" maxLength={40} required /></div>
+            <div className="form-group"><label htmlFor="agent-name">Full name *</label><input className="field" id="agent-name" name="full_name" defaultValue={editing?.full_name || ""} maxLength={120} required /></div>
+            <div className="form-group"><label htmlFor="agent-phone">Phone</label><input className="field" id="agent-phone" name="phone" defaultValue={editing?.phone || ""} maxLength={40} /></div>
+            <div className="form-group"><label htmlFor="agent-email">Email</label><input className="field" id="agent-email" name="email" type="email" defaultValue={editing?.email || ""} maxLength={160} /></div>
+            <div className="form-group"><label htmlFor="agent-status">Status</label><select className="field" id="agent-status" name="status" defaultValue={editing?.status || "active"}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+          </div>
+          <div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-notes">Internal notes</label><textarea className="field" id="agent-notes" name="notes" defaultValue={editing?.notes || ""} maxLength={1000} /></div>
+          <div className="admin-actions" style={{ marginTop: 16 }}><button className="button accent" type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Save agent" : "Add agent"}</button>{editing ? <button className="button secondary" type="button" onClick={() => setEditing(null)}>Cancel</button> : null}</div>
+        </form>
+      </div>
+
+      <div className="panel">
+        <h2>Agent payouts</h2>
+        <p className="location">Record commissions or sourcing fees privately. Nothing here appears on the public site.</p>
+        <form onSubmit={createPayout} style={{ marginTop: 14 }}>
+          <div className="form-grid">
+            <div className="form-group"><label htmlFor="payout-agent">Agent *</label><select className="field" id="payout-agent" name="agent_id" value={selectedAgent} onChange={(event) => setSelectedAgent(event.target.value)} required><option value="">Select agent</option>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.agent_code} — {agent.full_name}</option>)}</select></div>
+            <div className="form-group"><label htmlFor="payout-amount">Amount (GHS) *</label><input className="field" id="payout-amount" name="amount" type="number" min="0" step="0.01" required /></div>
+            <div className="form-group"><label htmlFor="payout-listing">Listing</label><select className="field" id="payout-listing" name="listing_id"><option value="">None</option>{listings.filter((item) => !item.is_demo).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></div>
+            <div className="form-group"><label htmlFor="payout-ad">Advertisement</label><select className="field" id="payout-ad" name="ad_id"><option value="">None</option>{ads.map((ad) => <option key={ad.id} value={ad.id}>{ad.title}</option>)}</select></div>
+          </div>
+          <div className="form-grid" style={{ marginTop: 12 }}><div className="form-group"><label htmlFor="payout-reference">Payment reference</label><input className="field" id="payout-reference" name="reference" maxLength={120} /></div><div className="form-group"><label htmlFor="payout-notes">Notes</label><input className="field" id="payout-notes" name="notes" maxLength={500} /></div></div>
+          <button className="button accent" type="submit" style={{ marginTop: 14 }}>Record pending payout</button>
+        </form>
+        <div className="admin-list" style={{ marginTop: 20 }}>
+          {payouts.filter((payout) => !selectedAgent || payout.agent_id === selectedAgent).map((payout) => (
+            <div className="admin-list-item" key={payout.id}>
+              <div><strong>{payout.agent?.agent_code || "Agent"} · GH₵{Number(payout.amount).toFixed(2)}</strong><div className="location">{payout.status} · {payout.reference || "No reference"}</div><div className="location">{payout.notes || "No notes"}</div></div>
+              <select className="field compact-select" aria-label={`Update payout status for ${payout.agent?.agent_code || "agent"}`} value={payout.status} onChange={(event) => void updatePayout(payout.id, event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="paid">Paid</option><option value="cancelled">Cancelled</option></select>
+            </div>
+          ))}
+        </div>
+        {!payouts.filter((payout) => !selectedAgent || payout.agent_id === selectedAgent).length ? <div className="empty" style={{ marginTop: 15 }}>No payouts for the selected agent.</div> : null}
+      </div>
+    </div>
   );
 }
 

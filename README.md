@@ -199,3 +199,18 @@ The site includes technical SEO for Google and other search engines:
 - Organization/WebSite structured data.
 
 Before launch, set `NEXT_PUBLIC_SITE_URL` to the exact public domain. After deployment, verify the domain in Google Search Console and submit the generated `/sitemap.xml`. Search engines decide when and where pages appear; SEO setup improves discoverability but cannot guarantee a ranking or immediate indexing.
+
+
+## Property sharing and agent tracking
+
+The platform now includes two internal/public workflow improvements:
+
+- **Property sharing:** published listing cards and property detail pages include a Share button. On supported mobile browsers it uses the native device share sheet and includes the first property image as a shareable file when the browser permits it. The share text includes the property title, location, rent, bedrooms/bathrooms and the direct JDFortiHomes listing URL. If file sharing is unavailable, it falls back to sharing/copying the listing link and text.
+- **Private agent tracking:** agents are stored in an admin-only `agents` table. Listings and advertisements can optionally be assigned to a source agent through private join tables, so the agent ID/name is visible to administrators but is not exposed by public listing queries.
+- **Agent payouts:** administrators can record a pending GHS sourcing/commission payout against an agent and optionally link it to a listing or advertisement, then move it through pending, approved, paid or cancelled.
+
+### Supabase update
+
+Run the updated `supabase/schema.sql` in the Supabase SQL Editor. The additional tables are `agents`, `listing_agents`, `ad_agents`, and `agent_payouts`. These tables have admin-only RLS policies.
+
+The public `listings` table is deliberately not given an `agent_id` column. This prevents an agent's internal identity from being exposed to anonymous visitors through the existing public listing SELECT policy.
