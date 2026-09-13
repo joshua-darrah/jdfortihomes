@@ -7,11 +7,13 @@ type Media = { type: "image" | "video"; url: string; index: number };
 export function PropertyGallery({
   title,
   images,
-  videos
+  videos,
+  videoThumbnails
 }: {
   title: string;
   images: string[];
   videos: string[];
+  videoThumbnails?: string[];
 }) {
   const media: Media[] = [
     ...images.map((url, index) => ({ type: "image" as const, url, index })),
@@ -45,7 +47,11 @@ export function PropertyGallery({
             aria-pressed={active === index}
           >
             {item.type === "video" ? (
-              <video src={item.url} muted preload="metadata" aria-hidden="true" />
+              videoThumbnails?.[item.index] ? (
+                <img src={videoThumbnails[item.index]} alt="" />
+              ) : (
+                <video src={item.url} muted preload="metadata" aria-hidden="true" />
+              )
             ) : (
               <img src={item.url} alt="" />
             )}

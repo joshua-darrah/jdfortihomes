@@ -205,7 +205,7 @@ Before launch, set `NEXT_PUBLIC_SITE_URL` to the exact public domain. After depl
 
 The platform now includes two internal/public workflow improvements:
 
-- **Property sharing:** published listing cards and property detail pages include a Share button. On supported mobile browsers it uses the native device share sheet and includes the first property image as a shareable file when the browser permits it. The share text includes the property title, location, rent, bedrooms/bathrooms and the direct JDFortiHomes listing URL. If file sharing is unavailable, it falls back to sharing/copying the listing link and text.
+- **Property sharing:** published listing cards and property detail pages include a Share button. On supported mobile browsers it uses the native device share sheet with the listing URL and property details; it does not attach the image as a file, allowing WhatsApp and other platforms to build a normal link preview from the listing metadata. The share text includes the property title, location, rent, bedrooms/bathrooms and the direct JDFortiHomes listing URL. If file sharing is unavailable, it falls back to sharing/copying the listing link and text.
 - **Private agent tracking:** agents are stored in an admin-only `agents` table. Listings and advertisements can optionally be assigned to a source agent through private join tables, so the agent ID/name is visible to administrators but is not exposed by public listing queries.
 - **Agent payouts:** administrators can record a pending GHS sourcing/commission payout against an agent and optionally link it to a listing or advertisement, then move it through pending, approved, paid or cancelled.
 
@@ -214,3 +214,58 @@ The platform now includes two internal/public workflow improvements:
 Run the updated `supabase/schema.sql` in the Supabase SQL Editor. The additional tables are `agents`, `listing_agents`, `ad_agents`, and `agent_payouts`. These tables have admin-only RLS policies.
 
 The public `listings` table is deliberately not given an `agent_id` column. This prevents an agent's internal identity from being exposed to anonymous visitors through the existing public listing SELECT policy.
+
+## Property sharing and agent access
+
+### Listing sharing
+
+Published listings include a Share button. The share action sends the listing title/details and the canonical listing URL through the device/browser share sheet. It deliberately does not attach the property image as a file. Messaging and social platforms can therefore generate their own link preview from the listing page's Open Graph metadata and image.
+
+The individual listing page provides listing-specific Open Graph title/description plus a preview image chosen in this order: first property photo, then the first available video thumbnail, then the JDFortiHomes default image. The page also exposes the first video as Open Graph video metadata when available. `NEXT_PUBLIC_SITE_URL` must be set to the real production domain for correct canonical/share URLs.
+
+### Restricted agent accounts
+
+Agents are separate from administrators. The supported roles are:
+
+- `customer`
+- `agent`
+- `admin`
+
+Administrators use `/admin`. Agents use `/agent`. An authenticated agent is denied access to `/admin` and receives only the agent dashboard.
+
+Agent dashboard permissions are limited to:
+
+- Create and edit their own property listings
+- Create and edit their own advertisements
+- View bookings attached to their assigned properties
+- Update booking status through the restricted agent status function
+- View payment proof files for their assigned-property bookings
+
+Agents cannot manage other agents, agent payouts, all platform bookings, all listings, all advertisements, users, profiles, or administrator settings.
+
+### Creating/linking an agent account
+
+1. Create the person's normal Auth account in Supabase Authentication → Users.
+2. In the JDFortiHomes Admin → Agents section, create the matching agent record and Agent ID (for example `AG-001`).
+3. Edit that agent and paste the Supabase Auth user ID into `Supabase Auth user ID`.
+4. Saving the agent with a Supabase Auth user ID automatically links the account and changes its `profiles.role` to `agent`.
+5. The account then signs in at `/agent`.
+
+Run `supabase/agent-tracking.sql` followed by `supabase/agent-access.sql` when upgrading an existing database. A fresh installation can use the complete `supabase/schema.sql`, which includes both migrations.
+
+### Security model
+
+The agent restriction is enforced by Supabase Row Level Security, not only by hiding dashboard buttons. Agent listing/ad records are automatically attributed to the signed-in agent when created, and booking status changes use a server-side database function that changes only the booking status.
+
+## Property media
+
+Listings support photos, direct video URLs, and uploaded MP4/WebM/MOV videos. A listing may contain photos only, videos only, or both. Uploaded videos can have a poster thumbnail generated in the browser and stored in `video_thumbnail_urls`. YouTube video URLs automatically receive a YouTube thumbnail when no custom thumbnail is supplied.
+
+Media behavior:
+- Photo + video: the first property photo is used for listing cards and Open Graph/social previews; videos remain playable in the property gallery.
+- Photo only: the first property photo is used everywhere a preview image is needed.
+- Video only: the generated video thumbnail, YouTube thumbnail, or manually supplied thumbnail is used for listing cards and Open Graph/social previews.
+- Agents and administrators can upload videos and optional thumbnail URLs.
+- `video_thumbnail_urls` follows the same order as `video_urls`.
+
+If an existing Supabase project predates this feature, run `supabase/video-media.sql` once in the Supabase SQL Editor.

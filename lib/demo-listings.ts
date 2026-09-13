@@ -25,6 +25,7 @@ export const demoListings: Listing[] = [
       "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=85"
     ],
     video_urls: [],
+    video_thumbnail_urls: [],
     contact_name: "Demo Property Representative",
     contact_phone: "",
     status: "published",
@@ -61,6 +62,7 @@ export const demoListings: Listing[] = [
       "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=85"
     ],
     video_urls: [],
+    video_thumbnail_urls: [],
     contact_name: "Demo Property Representative",
     contact_phone: "",
     status: "published",
@@ -97,6 +99,7 @@ export const demoListings: Listing[] = [
       "https://images.unsplash.com/photo-1600607688969-a5bfcd646154?auto=format&fit=crop&w=1200&q=85"
     ],
     video_urls: [],
+    video_thumbnail_urls: [],
     contact_name: "Demo Property Representative",
     contact_phone: "",
     status: "published",

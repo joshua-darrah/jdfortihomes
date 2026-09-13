@@ -29,36 +29,13 @@ export function ShareListingButton({ listing }: { listing: Listing }) {
     try {
       const url = `${window.location.origin}/listing/${listing.id}`;
       const text = buildShareText(listing);
-      const imageUrl = listing.image_urls?.[0];
-      let file: File | null = null;
-
-      if (imageUrl) {
-        try {
-          const response = await fetch(imageUrl, { mode: "cors" });
-          if (response.ok) {
-            const blob = await response.blob();
-            const extension = blob.type === "image/png" ? "png" : "jpg";
-            file = new File([blob], `jdfortihomes-${listing.id}.${extension}`, {
-              type: blob.type || "image/jpeg"
-            });
-          }
-        } catch {
-          // Sharing still works with the listing link if the image cannot be fetched.
-        }
-      }
 
       if (navigator.share) {
-        const shareData: ShareData = {
+        await navigator.share({
           title: listing.title,
           text,
           url
-        };
-
-        if (file && navigator.canShare?.({ files: [file] })) {
-          shareData.files = [file];
-        }
-
-        await navigator.share(shareData);
+        });
         setStatus("idle");
         return;
       }

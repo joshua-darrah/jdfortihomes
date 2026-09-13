@@ -19,6 +19,7 @@ export type Listing = {
   amenities: string[];
   image_urls: string[];
   video_urls: string[];
+  video_thumbnail_urls: string[];
   contact_name: string | null;
   contact_phone: string | null;
   media_rights_confirmed: boolean;
@@ -81,6 +82,7 @@ export type Ad = {
 
 export type Agent = {
   id: string;
+  user_id: string | null;
   agent_code: string;
   full_name: string;
   phone: string | null;

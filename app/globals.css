@@ -424,3 +424,13 @@ a.ad-banner:hover { transform:translateY(-2px); border-color:#b8bfc4; box-shadow
 @media (max-width: 520px) {
   .detail-actions { grid-template-columns: 1fr; }
 }
+
+.agent-dashboard-id { color:#bfc5c9; font-size:12px; margin-top:3px; }
+.agent-booking-list { display:grid; gap:14px; }
+.agent-booking { border:1px solid var(--line); border-radius:13px; padding:16px; background:#fff; }
+.agent-booking-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
+.compact-select { min-width:190px; width:auto; }
+@media (max-width:560px) {
+  .agent-booking-head { flex-direction:column; }
+  .compact-select { width:100%; }
+}

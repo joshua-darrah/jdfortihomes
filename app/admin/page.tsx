@@ -6,6 +6,7 @@ import type { Ad, Agent, AgentPayout, Booking, Listing } from "@/lib/types";
 import { AD_PLACEMENTS } from "@/lib/ads";
 import { formatGhs } from "@/lib/utils";
 import { AdminSkeleton } from "@/components/Skeletons";
+import { createVideoThumbnail, getVideoThumbnailUrl } from "@/lib/video";
 
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
@@ -587,8 +588,9 @@ function ListingEditor({
   const [saving, setSaving] = useState(false);
 
   async function uploadFiles(listingId: string, files: FileList | null, kind: "image" | "video") {
-    if (!files || !files.length || !supabase) return [] as string[];
+    if (!files || !files.length || !supabase) return { urls: [] as string[], thumbnails: [] as string[] };
     const urls: string[] = [];
+    const thumbnails: string[] = [];
     const maxSize = kind === "image" ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE;
     const allowed = kind === "image"
       ? ["image/jpeg", "image/png", "image/webp"]
@@ -612,9 +614,27 @@ function ListingEditor({
         throw new Error(`${kind === "image" ? "Photo" : "Video"} upload failed: ${result.error.message}`);
       }
       urls.push(supabase.storage.from("listing-media").getPublicUrl(path).data.publicUrl);
+
+      if (kind === "video") {
+        const thumbnail = await createVideoThumbnail(file);
+        if (thumbnail) {
+          const thumbnailPath = `listings/${listingId}/thumbnails/${crypto.randomUUID()}.jpg`;
+          const thumbnailUpload = await supabase.storage.from("listing-media").upload(thumbnailPath, thumbnail, {
+            upsert: false,
+            contentType: "image/jpeg"
+          });
+          if (!thumbnailUpload.error) {
+            thumbnails.push(supabase.storage.from("listing-media").getPublicUrl(thumbnailPath).data.publicUrl);
+          } else {
+            thumbnails.push("");
+          }
+        } else {
+          thumbnails.push("");
+        }
+      }
     }
 
-    return urls;
+    return { urls, thumbnails };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -637,6 +657,8 @@ function ListingEditor({
     try {
       const imageUrls = String(form.get("image_urls") || "").split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
       const videoUrls = String(form.get("video_urls") || "").split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+      const manualVideoThumbnails = String(form.get("video_thumbnail_urls") || "").split(/\r?\n/).map((value) => value.trim());
+      const videoThumbnailUrls = videoUrls.map((url, index) => manualVideoThumbnails[index] || getVideoThumbnailUrl(url) || "");
       const payload = {
         title: String(form.get("title") || "").trim(),
         description: String(form.get("description") || "").trim(),
@@ -655,6 +677,7 @@ function ListingEditor({
         amenities: String(form.get("amenities") || "").split(",").map((value) => value.trim()).filter(Boolean),
         image_urls: imageUrls,
         video_urls: videoUrls,
+        video_thumbnail_urls: videoThumbnailUrls,
         contact_name: String(form.get("contact_name") || "").trim() || null,
         contact_phone: String(form.get("contact_phone") || "").trim() || null,
         media_rights_confirmed: rightsConfirmed,
@@ -686,10 +709,11 @@ function ListingEditor({
         await supabase.from("listing_agents").delete().eq("listing_id", id!);
       }
 
-      if (uploadedImages.length || uploadedVideos.length) {
+      if (uploadedImages.urls.length || uploadedVideos.urls.length) {
         const { error } = await supabase.from("listings").update({
-          image_urls: [...imageUrls, ...uploadedImages],
-          video_urls: [...videoUrls, ...uploadedVideos]
+          image_urls: [...imageUrls, ...uploadedImages.urls],
+          video_urls: [...videoUrls, ...uploadedVideos.urls],
+          video_thumbnail_urls: [...videoThumbnailUrls, ...uploadedVideos.thumbnails]
         }).eq("id", id!);
         if (error) throw error;
       }
@@ -747,6 +771,12 @@ function ListingEditor({
         <label htmlFor="video-files">Upload property videos</label>
         <input className="field" id="video-files" type="file" name="video_files" accept="video/mp4,video/webm,video/quicktime" multiple />
         <span className="upload-note">MP4, WebM or MOV. Maximum 50 MB per video.</span>
+      </div>
+
+      <div className="form-group" style={{ marginTop: 12 }}>
+        <label htmlFor="video-thumbnail-urls">Video thumbnail URLs (optional)</label>
+        <textarea className="field" id="video-thumbnail-urls" name="video_thumbnail_urls" defaultValue={listing?.video_thumbnail_urls?.join("\n") || ""} placeholder="One thumbnail URL per video. Uploaded videos get thumbnails automatically; YouTube URLs are detected automatically." />
+        <span className="upload-note">Used for property cards and link previews when there is no property photo.</span>
       </div>
 
       <div className="form-group" style={{ marginTop: 12 }}>
@@ -1203,6 +1233,7 @@ function AgentPanel({
     event.preventDefault();
     if (!supabase) return;
     const form = new FormData(event.currentTarget);
+    const userId = String(form.get("user_id") || "").trim() || null;
     const payload = {
       agent_code: String(form.get("agent_code") || "").trim().toUpperCase(),
       full_name: String(form.get("full_name") || "").trim(),
@@ -1215,9 +1246,27 @@ function AgentPanel({
     setSaving(true);
     const result = editing
       ? await supabase.from("agents").update(payload).eq("id", editing.id)
-      : await supabase.from("agents").insert(payload);
+      : await supabase.from("agents").insert(payload).select("id").single();
+    if (result.error) {
+      setSaving(false);
+      setMessage(result.error.message);
+      return;
+    }
+
+    const agentId = editing?.id || ("data" in result ? result.data?.id : null);
+    if (agentId) {
+      const { error: linkError } = await supabase.rpc("link_agent_account", {
+        agent_record_id: agentId,
+        auth_user_id: userId
+      });
+      if (linkError) {
+        setSaving(false);
+        setMessage(linkError.message);
+        return;
+      }
+    }
+
     setSaving(false);
-    if (result.error) { setMessage(result.error.message); return; }
     setMessage(editing ? "Agent updated." : "Agent added.");
     setEditing(null);
     await reload();
@@ -1260,7 +1309,7 @@ function AgentPanel({
           <div className="admin-list">
             {agents.map((agent) => (
               <div className="admin-list-item" key={agent.id}>
-                <div><strong>{agent.agent_code}</strong><div>{agent.full_name}</div><div className="location">{agent.phone || agent.email || "No contact details"} · {agent.status}</div></div>
+                <div><strong>{agent.agent_code}</strong><div>{agent.full_name}</div><div className="location">{agent.phone || agent.email || "No contact details"} · {agent.status}</div><div className="agent-ref">Account: {agent.user_id ? "Linked" : "Not linked"}</div></div>
                 <div className="admin-actions"><button className="button secondary small" type="button" onClick={() => setEditing(agent)}>Edit</button><button className="button secondary small" type="button" onClick={() => setSelectedAgent(agent.id)}>View payouts</button></div>
               </div>
             ))}
@@ -1277,7 +1326,7 @@ function AgentPanel({
             <div className="form-group"><label htmlFor="agent-email">Email</label><input className="field" id="agent-email" name="email" type="email" defaultValue={editing?.email || ""} maxLength={160} /></div>
             <div className="form-group"><label htmlFor="agent-status">Status</label><select className="field" id="agent-status" name="status" defaultValue={editing?.status || "active"}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
           </div>
-          <div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-notes">Internal notes</label><textarea className="field" id="agent-notes" name="notes" defaultValue={editing?.notes || ""} maxLength={1000} /></div>
+          <div className="form-group"><label htmlFor="agent-user-id">Supabase Auth user ID</label><input className="field" id="agent-user-id" name="user_id" defaultValue={editing?.user_id || ""} placeholder="Optional — link the agent login account" /><span className="upload-note">Create the user in Supabase Authentication first, then paste their user ID here.</span></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-notes">Internal notes</label><textarea className="field" id="agent-notes" name="notes" defaultValue={editing?.notes || ""} maxLength={1000} /></div>
           <div className="admin-actions" style={{ marginTop: 16 }}><button className="button accent" type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Save agent" : "Add agent"}</button>{editing ? <button className="button secondary" type="button" onClick={() => setEditing(null)}>Cancel</button> : null}</div>
         </form>
       </div>

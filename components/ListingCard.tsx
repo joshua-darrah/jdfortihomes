@@ -4,13 +4,13 @@ import { formatGhs } from "@/lib/utils";
 import { ShareListingButton } from "@/components/ShareListingButton";
 
 export function ListingCard({ listing }: { listing: Listing }) {
-  const image = listing.image_urls?.[0];
+  const image = listing.image_urls?.[0] || listing.video_thumbnail_urls?.find(Boolean);
 
   return (
     <article className="card">
       <Link href={`/listing/${listing.id}`} aria-label={`View details for ${listing.title}`}>
         <div className="card-image">
-          {image ? <img src={image} alt={`${listing.title} property`} loading="lazy" /> : <div className="media-placeholder">No property photo</div>}
+          {image ? <img src={image} alt={`${listing.title} property`} loading="lazy" /> : listing.video_urls?.length ? <div className="media-placeholder">Property video</div> : <div className="media-placeholder">No property media</div>}
           {listing.is_demo ? <span className="badge">Demo listing</span> : null}
           {listing.is_sponsored ? <span className="badge sponsored-badge">Sponsored</span> : null}
           {listing.video_urls?.length ? <span className="media-count">Video</span> : null}
