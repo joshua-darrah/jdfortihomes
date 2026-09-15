@@ -55,6 +55,7 @@ export type Booking = {
   updated_at: string;
   deleted_at: string | null;
   deleted_by: string | null;
+  agent_id?: string | null;
   listing?: Pick<Listing, "title" | "location" | "city">;
 };
 

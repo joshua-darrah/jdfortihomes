@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
-import type { Ad, Agent, Booking, Listing } from "@/lib/types";
+import type { Ad, Agent, AgentPayout, Booking, Listing } from "@/lib/types";
 import { formatGhs } from "@/lib/utils";
 import { createVideoThumbnail, getVideoThumbnailUrl } from "@/lib/video";
 
@@ -10,7 +10,7 @@ const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
 const MAX_AD_IMAGE_SIZE = 5 * 1024 * 1024;
 
-type AgentTab = "listings" | "ads" | "bookings";
+type AgentTab = "overview" | "listings" | "ads" | "bookings";
 
 export default function AgentPage() {
   const [session, setSession] = useState<any>(null);
@@ -24,6 +24,8 @@ export default function AgentPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [payouts, setPayouts] = useState<AgentPayout[]>([]);
+  const [directBookingIds, setDirectBookingIds] = useState<Set<string>>(new Set());
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [editingAd, setEditingAd] = useState<Ad | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -93,21 +95,27 @@ export default function AgentPage() {
     if (!supabase) return;
     setDataLoading(true);
 
-    const [listingResult, adResult, bookingResult] = await Promise.all([
+    const [listingResult, adResult, bookingResult, payoutResult, bookingAgentResult] = await Promise.all([
       supabase.from("listings").select("*").order("created_at", { ascending: false }),
       supabase.from("ads").select("*").order("created_at", { ascending: false }),
       supabase
         .from("bookings")
         .select("*, listing:listings(title, location, city)")
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase.from("agent_payouts").select("*").order("created_at", { ascending: false }),
+      supabase.from("booking_agents").select("booking_id")
     ]);
 
     if (listingResult.error) setError(listingResult.error.message);
     if (adResult.error) setError(adResult.error.message);
     if (bookingResult.error) setError(bookingResult.error.message);
+    if (payoutResult.error) setError(payoutResult.error.message);
+    if (bookingAgentResult.error) setError(bookingAgentResult.error.message);
     setListings((listingResult.data || []) as Listing[]);
     setAds((adResult.data || []) as Ad[]);
     setBookings((bookingResult.data || []) as Booking[]);
+    setPayouts((payoutResult.data || []) as AgentPayout[]);
+    setDirectBookingIds(new Set((bookingAgentResult.data || []).map((row: { booking_id: string }) => row.booking_id)));
     setDataLoading(false);
   }
 
@@ -174,6 +182,7 @@ export default function AgentPage() {
 
       <div className="container admin-body">
         <div className="admin-tabs" role="tablist" aria-label="Agent sections">
+          <button className={`tab ${tab === "overview" ? "active" : ""}`} type="button" onClick={() => setTab("overview")}>Overview</button>
           <button className={`tab ${tab === "listings" ? "active" : ""}`} type="button" onClick={() => setTab("listings")}>My listings ({listings.length})</button>
           <button className={`tab ${tab === "ads" ? "active" : ""}`} type="button" onClick={() => setTab("ads")}>My ads ({ads.length})</button>
           <button className={`tab ${tab === "bookings" ? "active" : ""}`} type="button" onClick={() => setTab("bookings")}>My bookings ({bookings.length})</button>
@@ -183,11 +192,49 @@ export default function AgentPage() {
         {error ? <div className="notice error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
         {dataLoading ? <div className="panel"><p className="location">Loading your workspace...</p></div> : null}
 
+        {!dataLoading && tab === "overview" ? <AgentOverview agent={agent} listings={listings} ads={ads} bookings={bookings} payouts={payouts} directBookingIds={directBookingIds} /> : null}
         {!dataLoading && tab === "listings" ? <AgentListings listings={listings} editing={editingListing} setEditing={setEditingListing} reload={loadData} setMessage={setMessage} /> : null}
         {!dataLoading && tab === "ads" ? <AgentAds ads={ads} listings={listings} editing={editingAd} setEditing={setEditingAd} reload={loadData} setMessage={setMessage} /> : null}
-        {!dataLoading && tab === "bookings" ? <AgentBookings bookings={bookings} onStatus={updateBookingStatus} /> : null}
+        {!dataLoading && tab === "bookings" ? <AgentBookings bookings={bookings} directBookingIds={directBookingIds} onStatus={updateBookingStatus} /> : null}
       </div>
     </main>
+  );
+}
+
+function AgentOverview({ agent, listings, ads, bookings, payouts, directBookingIds }: { agent: Agent; listings: Listing[]; ads: Ad[]; bookings: Booking[]; payouts: AgentPayout[]; directBookingIds: Set<string> }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const activeBookings = bookings.filter((booking) => !booking.deleted_at && booking.status !== "cancelled");
+  const upcoming = activeBookings.filter((booking) => booking.preferred_date >= today).sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`)).slice(0, 5);
+  const pending = activeBookings.filter((booking) => ["pending_payment", "payment_submitted"].includes(booking.status)).length;
+  const completed = activeBookings.filter((booking) => booking.status === "tour_completed").length;
+  const pendingPayout = payouts.filter((payout) => ["pending", "approved"].includes(payout.status)).reduce((sum, payout) => sum + Number(payout.amount), 0);
+  const paidPayout = payouts.filter((payout) => payout.status === "paid").reduce((sum, payout) => sum + Number(payout.amount), 0);
+
+  return (
+    <div className="admin-overview">
+      <div className="overview-header">
+        <div><div className="eyebrow">Agent workspace</div><h1>Welcome, {agent.full_name.split(" ")[0]}</h1><p className="location">Track your assigned properties, tours, advertisements and earnings from one place.</p></div>
+        <div className="agent-dashboard-id">{agent.agent_code} · {agent.status}</div>
+      </div>
+      <div className="overview-stats">
+        <div className="overview-stat"><small>Assigned bookings</small><strong>{activeBookings.length}</strong><span>{pending} need attention</span></div>
+        <div className="overview-stat"><small>My listings</small><strong>{listings.length}</strong><span>{listings.filter((item) => item.status === "published").length} published</span></div>
+        <div className="overview-stat"><small>My advertisements</small><strong>{ads.length}</strong><span>{ads.filter((item) => item.status === "active").length} active</span></div>
+        <div className="overview-stat"><small>Pending payout</small><strong>{formatGhs(pendingPayout)}</strong><span>{formatGhs(paidPayout)} paid</span></div>
+      </div>
+      <div className="overview-grid">
+        <section className="panel">
+          <div className="panel-heading"><div><h2>Next tours</h2><p className="location">Bookings that should be handled next.</p></div></div>
+          <div className="admin-list">{upcoming.map((booking) => <div className="admin-list-item" key={booking.id}><div><strong>{booking.reference}</strong><div>{booking.customer_name} · {booking.listing?.title || "Property"}</div><div className="location">{booking.preferred_date} · {booking.preferred_time} · {directBookingIds.has(booking.id) ? "Directly assigned" : "Property assignment"}</div></div><span className="status">{booking.status.replaceAll("_", " ")}</span></div>)}</div>
+          {!upcoming.length ? <div className="empty">No upcoming tours.</div> : null}
+        </section>
+        <section className="panel">
+          <div className="panel-heading"><div><h2>Performance</h2><p className="location">A simple snapshot of your current workload.</p></div></div>
+          <div className="overview-mini-stats"><div><small>Completed tours</small><strong>{completed}</strong></div><div><small>Active listings</small><strong>{listings.filter((item) => item.status !== "draft").length}</strong></div><div><small>Paid out</small><strong>{formatGhs(paidPayout)}</strong></div></div>
+          <div className="agent-help"><strong>Need a booking?</strong><span>Contact the JDFortiHomes administrator if you need more assignments or if your workload is low.</span></div>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -351,7 +398,7 @@ function AgentAdEditor({ ad, listings, onSaved, onCancel, onMessage }: { ad: Ad 
   return <form className="panel" onSubmit={submit}><h2>{ad ? "Edit advertisement" : "Create advertisement"}</h2><div className="form-group"><label htmlFor="agent-ad-type">Category *</label><select className="field" id="agent-ad-type" name="ad_type" defaultValue={ad?.ad_type || "platform_promotion"}><option value="platform_promotion">JDFortiHomes promotion</option><option value="sponsored_property">Sponsored property</option></select></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-ad-listing">Sponsored property</label><select className="field" id="agent-ad-listing" name="listing_id" defaultValue={ad?.listing_id || ""}><option value="">Select a property</option>{listings.filter((item) => !item.is_demo).map((item) => <option key={item.id} value={item.id}>{item.title} — {item.location}, {item.city}</option>)}</select></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-ad-title">Title *</label><input className="field" id="agent-ad-title" name="title" defaultValue={ad?.title || ""} required /></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-ad-description">Message</label><textarea className="field" id="agent-ad-description" name="description" defaultValue={ad?.description || ""} /></div><div className="form-grid" style={{ marginTop: 12 }}><div className="form-group"><label htmlFor="agent-ad-placement">Placement</label><select className="field" id="agent-ad-placement" name="placement" defaultValue={ad?.placement || "home_top"}><option value="home_top">Home — top</option><option value="home_mid">Home — middle</option><option value="directory_top">Directory — top</option></select></div><div className="form-group"><label htmlFor="agent-ad-status">Status</label><select className="field" id="agent-ad-status" name="status" defaultValue={ad?.status || "draft"}><option value="draft">Draft</option><option value="active">Active</option><option value="paused">Paused</option></select></div><div className="form-group"><label htmlFor="agent-ad-duration">Duration (days)</label><input className="field" id="agent-ad-duration" name="duration" type="number" min="1" defaultValue="7" /></div></div><div className="form-grid" style={{ marginTop: 12 }}><div className="form-group"><label htmlFor="agent-ad-advertiser">Advertiser / owner</label><input className="field" id="agent-ad-advertiser" name="advertiser_name" defaultValue={ad?.advertiser_name || ""} /></div><div className="form-group"><label htmlFor="agent-ad-contact">Advertiser contact</label><input className="field" id="agent-ad-contact" name="advertiser_contact" defaultValue={ad?.advertiser_contact || ""} /></div></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-ad-destination">Destination link</label><input className="field" id="agent-ad-destination" name="destination_url" defaultValue={ad?.destination_url || ""} /></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-ad-notes">Internal notes</label><textarea className="field" id="agent-ad-notes" name="internal_notes" defaultValue={ad?.internal_notes || ""} /></div><div className="form-group" style={{ marginTop: 12 }}><label htmlFor="agent-ad-image">Advertisement image</label><input className="field" id="agent-ad-image" name="ad_image" type="file" accept="image/jpeg,image/png,image/webp" /><span className="upload-note">Optional. Maximum 5 MB.</span></div><div className="admin-actions" style={{ marginTop: 18 }}><button className="button accent" type="submit" disabled={saving}>{saving ? "Saving..." : ad ? "Save changes" : "Submit advertisement"}</button>{ad ? <button className="button secondary" type="button" onClick={onCancel}>Cancel</button> : null}</div></form>;
 }
 
-function AgentBookings({ bookings, onStatus }: { bookings: Booking[]; onStatus: (id: string, status: string) => Promise<void> }) {
+function AgentBookings({ bookings, directBookingIds, onStatus }: { bookings: Booking[]; directBookingIds: Set<string>; onStatus: (id: string, status: string) => Promise<void> }) {
   const [proofs, setProofs] = useState<Record<string, string>>({});
   async function openProof(booking: Booking) {
     if (!supabase || !booking.payment_proof_path) return;
@@ -360,5 +407,5 @@ function AgentBookings({ bookings, onStatus }: { bookings: Booking[]; onStatus: 
     setProofs((current) => ({ ...current, [booking.id]: data.signedUrl }));
   }
 
-  return <div className="panel"><div className="panel-heading"><div><h2>Property-tour bookings</h2><p className="location">You can view and validate bookings for properties assigned to you.</p></div></div><div className="agent-booking-list">{bookings.map((booking) => <article className="agent-booking" key={booking.id}><div className="agent-booking-head"><div><strong>{booking.reference}</strong><div className="location">{booking.listing?.title || "Property"} · {booking.listing?.location}, {booking.listing?.city}</div></div><span className="status">{booking.status.replaceAll("_", " ")}</span></div><div className="detail-meta"><div className="stat"><small>Customer</small><strong>{booking.customer_name}</strong></div><div className="stat"><small>Phone</small><strong>{booking.customer_phone}</strong></div><div className="stat"><small>Date</small><strong>{booking.preferred_date}</strong></div><div className="stat"><small>Time</small><strong>{booking.preferred_time}</strong></div></div><div className="admin-actions"><select className="field compact-select" value={booking.status} onChange={(event) => void onStatus(booking.id, event.target.value)} aria-label={`Update status for ${booking.reference}`}><option value="pending_payment">Pending payment</option><option value="payment_submitted">Payment submitted</option><option value="confirmed">Confirmed</option><option value="tour_completed">Tour completed</option><option value="cancelled">Cancelled</option></select>{booking.payment_proof_path ? <button className="button secondary small" type="button" onClick={() => void openProof(booking)}>View payment proof</button> : null}</div>{proofs[booking.id] ? <a className="button secondary small" href={proofs[booking.id]} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>Open signed proof</a> : null}</article>)}</div>{!bookings.length ? <div className="empty">No bookings are currently attached to your properties.</div> : null}</div>;
+  return <div className="panel"><div className="panel-heading"><div><h2>Property-tour bookings</h2><p className="location">You can view and validate bookings for properties assigned to you.</p></div></div><div className="agent-booking-list">{bookings.map((booking) => <article className="agent-booking" key={booking.id}><div className="agent-booking-head"><div><strong>{booking.reference}</strong><div className="location">{booking.listing?.title || "Property"} · {booking.listing?.location}, {booking.listing?.city}</div></div><span className="status">{booking.status.replaceAll("_", " ")}</span></div>{directBookingIds.has(booking.id) ? <div className="assignment-badge">Directly assigned to you by JDFortiHomes</div> : null}<div className="detail-meta"><div className="stat"><small>Customer</small><strong>{booking.customer_name}</strong></div><div className="stat"><small>Phone</small><strong>{booking.customer_phone}</strong></div><div className="stat"><small>Date</small><strong>{booking.preferred_date}</strong></div><div className="stat"><small>Time</small><strong>{booking.preferred_time}</strong></div></div><div className="admin-actions"><select className="field compact-select" value={booking.status} onChange={(event) => void onStatus(booking.id, event.target.value)} aria-label={`Update status for ${booking.reference}`}><option value="pending_payment">Pending payment</option><option value="payment_submitted">Payment submitted</option><option value="confirmed">Confirmed</option><option value="tour_completed">Tour completed</option><option value="cancelled">Cancelled</option></select>{booking.payment_proof_path ? <button className="button secondary small" type="button" onClick={() => void openProof(booking)}>View payment proof</button> : null}</div>{proofs[booking.id] ? <a className="button secondary small" href={proofs[booking.id]} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>Open signed proof</a> : null}</article>)}</div>{!bookings.length ? <div className="empty">No bookings are currently attached to your properties.</div> : null}</div>;
 }
