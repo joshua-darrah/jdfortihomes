@@ -11,8 +11,8 @@ export function Footer() {
               src="/jdfortihomes-mark.png"
               alt="JDFortiHomes"
               className="footer-brand-mark"
-              width={1550}
-              height={793}
+              width={512}
+              height={512}
             />
             <div className="brand footer-brand"><span>JD</span>Forti<span className="footer-brand-home">Homes</span></div>
           </div>

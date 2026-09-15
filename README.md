@@ -1,54 +1,50 @@
 # JDFortiHomes
 
-JDFortiHomes is an accommodation discovery and property-tour platform in Ghana. The current application is Ghana-focused and is designed to be extended as the inventory and service grow.
+JDFortiHomes is a Ghana-focused accommodation discovery and property-tour booking platform. The project is built to stay simple, maintainable and ready to grow without introducing unnecessary dependencies.
 
-## Current stack
+## Stack
 
 - Next.js 15
 - React 19
+- TypeScript
 - Plain CSS
 - Supabase PostgreSQL
-- Supabase Auth for administrator access
-- Supabase Storage for listing media and private payment proofs
-- Supabase Realtime for listing refreshes
+- Supabase Auth
+- Supabase Storage
+- Supabase Realtime
 - Next.js server route for public booking creation
 
-## Important security change
+## Project structure
 
-Public customers no longer insert bookings directly into Supabase or upload payment proofs directly to the storage bucket. The booking form submits to `/api/bookings`, which validates the request on the server and uses the server-only `SUPABASE_SERVICE_ROLE_KEY` to create the booking and store the payment proof.
-
-**Never put `SUPABASE_SERVICE_ROLE_KEY` in a `NEXT_PUBLIC_*` variable or commit it to GitHub.**
+```text
+app/                 Next.js pages, layouts and API routes
+components/          Reusable UI components
+lib/                 Shared types, Supabase client, site config and helpers
+public/               Logo, favicon, social preview and verification assets
+supabase/             Database schema and focused migrations
+docs/                 Project documentation
+```
 
 ## Local setup
 
-1. Install Node.js 20+.
+1. Install Node.js 20 or newer.
 2. Run `npm install`.
 3. Create a Supabase project.
-4. Run the complete `supabase/schema.sql` in the Supabase SQL Editor.
+4. Run `supabase/schema.sql` in the Supabase SQL Editor for a fresh database.
 5. Create `.env.local` from `.env.example`.
-6. Add:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `NEXT_PUBLIC_TOUR_FEE_GHS`
-   - the real manual payment details
+6. Add the required Supabase and payment variables.
 7. Run `npm run dev`.
-8. Open `/admin` and create an administrator account in Supabase Authentication.
-9. Set that user's profile role to `admin`.
+8. Create an Auth user and set its `profiles.role` to `admin` for administrator access.
 
-Example role update:
+For an existing database, use the focused migration files in `supabase/` in the order documented in [`docs/DATABASE.md`](docs/DATABASE.md).
 
-```sql
-UPDATE public.profiles
-SET role = 'admin'
-WHERE id = 'YOUR_AUTH_USER_UUID';
-```
-
-## Manual payment configuration
-
-The customer booking flow expects real payment instructions. Configure these environment variables before accepting bookings:
+## Environment variables
 
 ```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SITE_URL=
 NEXT_PUBLIC_TOUR_FEE_GHS=50
 NEXT_PUBLIC_PAYMENT_MOMO_NETWORK=
 NEXT_PUBLIC_PAYMENT_MOMO_NAME=
@@ -58,214 +54,61 @@ NEXT_PUBLIC_PAYMENT_ACCOUNT_NAME=
 NEXT_PUBLIC_PAYMENT_ACCOUNT_NUMBER=
 ```
 
-The application intentionally does not contain fake account numbers or placeholder payment credentials.
+`SUPABASE_SERVICE_ROLE_KEY` is server-only. Never prefix it with `NEXT_PUBLIC_`, place it in client code, or commit it to Git.
 
-## Booking flow
+## Main workflows
 
-1. A customer opens a published property.
-2. The customer selects a tour date/time and enters only the information needed to arrange the tour.
-3. The customer makes the manually instructed tour-fee payment outside the application.
-4. The customer uploads a JPG, PNG, WebP or PDF payment proof up to 5 MB.
-5. The customer accepts the Terms of Service and Privacy Policy.
-6. `/api/bookings` validates the request, checks that the property is published, uploads the proof to private storage, and creates the booking.
-7. The customer receives a booking reference.
-8. An administrator can open the booking in `/admin` to see the customer details, selected property, tour information, notes, consent record and a signed link/preview for the payment proof.
+### Customer
 
-## Admin listing flow
+1. Browse published properties.
+2. Open a property.
+3. Select a tour date and time.
+4. Follow the configured manual payment instructions.
+5. Upload payment proof.
+6. Accept the Terms and Privacy Policy.
+7. Submit the booking.
+8. Receive a booking reference.
 
-Admins can:
+### Administrator
 
-- create, edit and delete listings;
-- upload property photos and videos;
-- set listing status;
-- add property details and amenities;
-- mark demonstration inventory clearly;
-- record a media-rights note;
-- confirm that the property information/media may be published;
-- manage booking status; and
-- export booking data to CSV.
+Administrators use `/admin` to manage bookings, listings, advertisements and agents. The Overview tab provides live operational analytics and refreshes in the background every 15 seconds.
 
-Published listings cannot be created from the public site. Public users can only read published inventory through the RLS policy.
+### Agent
 
-## Accessibility work included
+Agents use `/agent`. Access is enforced by Supabase RLS and database functions, not only by the UI. A direct booking assignment can override the normal property-level agent assignment for one booking.
 
-The current codebase includes:
+## Security principles
 
-- skip navigation;
-- semantic navigation and form labels;
-- visible keyboard focus indicators;
-- keyboard-operable buttons and gallery controls;
-- accessible table captions and status labels;
-- error/status announcements;
-- meaningful image alternative text;
-- reduced-motion support;
-- sufficiently strong text/button contrast in the current theme;
-- responsive layouts without removing core navigation on small screens; and
-- skeleton loading states for listings and admin data.
+- Public users cannot directly insert bookings into Supabase.
+- Booking creation uses the server-only service-role key.
+- Payment proofs are stored privately.
+- Admin and agent permissions are enforced with RLS.
+- Agent identity is kept in private assignment tables rather than public listing data.
+- No analytics, advertising or tracking scripts are installed.
+- No fake payment credentials are included.
 
-This is an implementation pass, not a legal certification or formal WCAG audit. A final launch should still be tested with keyboard-only navigation, screen readers and an automated accessibility scanner such as axe or Lighthouse.
+## Mobile and Apple devices
 
-## Privacy, cookies and data minimisation
+The interface uses responsive CSS, touch-friendly controls, safe-area support and local PNG branding assets. The project includes a favicon, Apple touch icon, web manifest and application icon so the brand remains available across Safari, iOS home-screen installs and desktop browsers.
 
-The application does not currently include advertising trackers or analytics scripts. It does not contain Google Analytics, Meta Pixel, Hotjar, Clarity or embedded third-party widgets.
+## Documentation
 
-The booking form collects only information required for the tour workflow plus an optional notes field. Payment proofs are stored in a private Supabase bucket and are not publicly readable.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — application structure and design principles
+- [`docs/DATABASE.md`](docs/DATABASE.md) — schema, relationships, RLS and migration order
+- [`docs/ADMIN.md`](docs/ADMIN.md) — administrator workflows and analytics
+- [`docs/AGENTS.md`](docs/AGENTS.md) — agent roles, assignments and permissions
+- [`docs/ANALYTICS.md`](docs/ANALYTICS.md) — dashboard metrics and how they are calculated
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel and Supabase deployment checklist
+- [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) — safe development and upgrade rules
+- [`SECURITY-ACCESSIBILITY-AUDIT.md`](SECURITY-ACCESSIBILITY-AUDIT.md) — security and accessibility notes
 
-The project includes:
+## Validation
 
-- `/privacy`
-- `/cookies`
-- `/terms`
-- `/refunds`
-- `/contact`
+Before deployment:
 
-The policies are written around the current workflow and Ghanaian data-protection context. They should be reviewed by qualified Ghanaian counsel and the operator should complete any Data Protection Commission registration/compliance obligations before commercial processing of personal data.
+```bash
+npm run typecheck
+npm run build
+```
 
-## Images and copyright
-
-The demo inventory uses clearly labelled Unsplash imagery for interface demonstration. It must not be presented as real property inventory. Before launch, replace demo imagery with photographs/media that JDFortiHomes or the relevant property representative is authorised to publish.
-
-Admins must confirm media rights before publishing a listing. The system does not claim ownership of third-party property media.
-
-## Legal and consumer protection boundaries
-
-JDFortiHomes does not promise that every property is available, owned by a particular person, suitable for a customer, or legally fit for a particular use. Customers are told to inspect and verify important property information before signing a tenancy agreement or making property-related payments.
-
-A tour request is not a tenancy agreement and does not guarantee the property. The refund policy applies to the JDFortiHomes tour fee only and does not automatically govern rent, deposits or other money paid directly to property owners or representatives.
-
-No software can guarantee that a business will never face a legal claim. These controls are intended to reduce avoidable risk; they do not replace legal advice, business registration, insurance, data-protection registration or operational due diligence.
-
-## Before launch checklist
-
-- Replace all demo listings and demo imagery.
-- Configure real payment instructions.
-- Set a real `SUPABASE_SERVICE_ROLE_KEY` only in the deployment environment.
-- Confirm the Supabase project has the latest `supabase/schema.sql` applied.
-- Create and test the admin account.
-- Verify listing and payment-proof storage policies.
-- Verify the booking API with valid and invalid inputs.
-- Test the site with keyboard-only navigation and a screen reader.
-- Run Lighthouse/axe and resolve any remaining issues.
-- Review the Terms, Privacy, Cookies and Refund Policy with Ghanaian legal counsel.
-- Complete any Data Protection Commission registration or other regulatory requirements that apply to the operator.
-- Add a real support process for booking disputes and refunds.
-- Deploy over HTTPS and keep the service-role key out of client-side code and source control.
-
-## Advertisement system
-
-The admin dashboard now includes an **Advertisements** section. Admins can create promotional ads with:
-
-- placement: Home page below hero, Home page between sections, or Find a place above results
-- start date and time
-- duration in days, weeks, or months
-- draft, active, or paused status
-- optional destination URL
-- optional JPG, PNG, or WebP artwork (maximum 5 MB)
-
-Ads are not shown just because they are marked active. The public query also checks the current time against `starts_at` and `ends_at`. When an ad expires, it automatically disappears from the public website while remaining visible in the admin dashboard for record keeping. No scheduled job is required for this visibility rule.
-
-Run the latest `supabase/schema.sql` in the Supabase SQL Editor after deploying this version. It creates the `ads` table and the `ad-media` storage bucket/policies.
-
-
-
-## Advertisement system
-
-The production ad system has two categories:
-
-- **JDFortiHomes promotion** — platform marketing such as “Affordable homes without the guesswork”, “Discover premium homes at better prices”, or location-specific campaigns. These can link to an internal page or an external advertiser destination.
-- **Sponsored property** — a property owner or representative can pay JDFortiHomes to promote an apartment, house, room, hostel or other accommodation. The admin first creates the property listing, confirms publishing rights, then creates a sponsored-property campaign linked to that listing.
-
-Every campaign has a placement, start date/time, duration and status. When the end time passes, the ad is automatically excluded from public results. Sponsored properties also receive a `visibility_ends_at` value so the property itself stops appearing in the public directory when its campaign expires. Expired campaigns remain visible to administrators for records.
-
-Recommended platform campaign copy:
-
-- “Affordable homes without the guesswork.”
-- “Looking for a premium home? Find better options with JDFortiHomes.”
-- “Find a place near where you need to be.”
-- “See it before you decide. Book a guided property tour.”
-
-Do not describe a property as verified, available, affordable, luxury or discounted unless the relevant claim has been checked and can be supported.
-
-## Search engine visibility
-
-The site includes technical SEO for Google and other search engines:
-
-- page titles and descriptions;
-- canonical URLs;
-- Open Graph and Twitter preview metadata;
-- a branded favicon and Apple touch icon;
-- `robots.txt`;
-- a dynamic `sitemap.xml` containing public pages and currently published listings; and
-- Organization/WebSite structured data.
-
-Before launch, set `NEXT_PUBLIC_SITE_URL` to the exact public domain. After deployment, verify the domain in Google Search Console and submit the generated `/sitemap.xml`. Search engines decide when and where pages appear; SEO setup improves discoverability but cannot guarantee a ranking or immediate indexing.
-
-
-## Property sharing and agent tracking
-
-The platform now includes two internal/public workflow improvements:
-
-- **Property sharing:** published listing cards and property detail pages include a Share button. On supported mobile browsers it uses the native device share sheet with the listing URL and property details; it does not attach the image as a file, allowing WhatsApp and other platforms to build a normal link preview from the listing metadata. The share text includes the property title, location, rent, bedrooms/bathrooms and the direct JDFortiHomes listing URL. If file sharing is unavailable, it falls back to sharing/copying the listing link and text.
-- **Private agent tracking:** agents are stored in an admin-only `agents` table. Listings and advertisements can optionally be assigned to a source agent through private join tables, so the agent ID/name is visible to administrators but is not exposed by public listing queries.
-- **Agent payouts:** administrators can record a pending GHS sourcing/commission payout against an agent and optionally link it to a listing or advertisement, then move it through pending, approved, paid or cancelled.
-
-### Supabase update
-
-Run the updated `supabase/schema.sql` in the Supabase SQL Editor. The additional tables are `agents`, `listing_agents`, `ad_agents`, and `agent_payouts`. These tables have admin-only RLS policies.
-
-The public `listings` table is deliberately not given an `agent_id` column. This prevents an agent's internal identity from being exposed to anonymous visitors through the existing public listing SELECT policy.
-
-## Property sharing and agent access
-
-### Listing sharing
-
-Published listings include a Share button. The share action sends the listing title/details and the canonical listing URL through the device/browser share sheet. It deliberately does not attach the property image as a file. Messaging and social platforms can therefore generate their own link preview from the listing page's Open Graph metadata and image.
-
-The individual listing page provides listing-specific Open Graph title/description plus a preview image chosen in this order: first property photo, then the first available video thumbnail, then the JDFortiHomes default image. The page also exposes the first video as Open Graph video metadata when available. `NEXT_PUBLIC_SITE_URL` must be set to the real production domain for correct canonical/share URLs.
-
-### Restricted agent accounts
-
-Agents are separate from administrators. The supported roles are:
-
-- `customer`
-- `agent`
-- `admin`
-
-Administrators use `/admin`. Agents use `/agent`. An authenticated agent is denied access to `/admin` and receives only the agent dashboard.
-
-Agent dashboard permissions are limited to:
-
-- Create and edit their own property listings
-- Create and edit their own advertisements
-- View bookings attached to their assigned properties
-- Update booking status through the restricted agent status function
-- View payment proof files for their assigned-property bookings
-
-Agents cannot manage other agents, agent payouts, all platform bookings, all listings, all advertisements, users, profiles, or administrator settings.
-
-### Creating/linking an agent account
-
-1. Create the person's normal Auth account in Supabase Authentication → Users.
-2. In the JDFortiHomes Admin → Agents section, create the matching agent record and Agent ID (for example `AG-001`).
-3. Edit that agent and paste the Supabase Auth user ID into `Supabase Auth user ID`.
-4. Saving the agent with a Supabase Auth user ID automatically links the account and changes its `profiles.role` to `agent`.
-5. The account then signs in at `/agent`.
-
-Run `supabase/agent-tracking.sql` followed by `supabase/agent-access.sql` when upgrading an existing database. A fresh installation can use the complete `supabase/schema.sql`, which includes both migrations.
-
-### Security model
-
-The agent restriction is enforced by Supabase Row Level Security, not only by hiding dashboard buttons. Agent listing/ad records are automatically attributed to the signed-in agent when created, and booking status changes use a server-side database function that changes only the booking status.
-
-## Property media
-
-Listings support photos, direct video URLs, and uploaded MP4/WebM/MOV videos. A listing may contain photos only, videos only, or both. Uploaded videos can have a poster thumbnail generated in the browser and stored in `video_thumbnail_urls`. YouTube video URLs automatically receive a YouTube thumbnail when no custom thumbnail is supplied.
-
-Media behavior:
-- Photo + video: the first property photo is used for listing cards and Open Graph/social previews; videos remain playable in the property gallery.
-- Photo only: the first property photo is used everywhere a preview image is needed.
-- Video only: the generated video thumbnail, YouTube thumbnail, or manually supplied thumbnail is used for listing cards and Open Graph/social previews.
-- Agents and administrators can upload videos and optional thumbnail URLs.
-- `video_thumbnail_urls` follows the same order as `video_urls`.
-
-If an existing Supabase project predates this feature, run `supabase/video-media.sql` once in the Supabase SQL Editor.
+Do not use `npm audit fix --force` blindly. Major framework upgrades must be tested as controlled migrations.

@@ -1,4 +1,7 @@
 -- JDFortiHomes: restricted agent accounts and agent dashboard access.
+-- IMPORTANT: run the enum statement below by itself and let it commit before
+-- running the rest of this migration. PostgreSQL does not allow a newly added
+-- enum value to be used in the same transaction that adds it.
 -- Run after agent-tracking.sql.
 -- Agents are normal Supabase Auth users with profiles.role = 'agent'.
 

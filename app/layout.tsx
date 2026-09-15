@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -7,6 +7,14 @@ import { Footer } from "@/components/Footer";
 import { getSiteUrl, siteKeywords } from "@/lib/seo";
 
 const siteUrl = getSiteUrl();
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+  colorScheme: "light"
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -54,6 +62,14 @@ export const metadata: Metadata = {
     description:
       "Find accommodation in Ghana, compare properties and book guided property tours.",
     images: ["/og-image.png"]
+  },
+  appleWebApp: {
+    capable: true,
+    title: "JDFortiHomes",
+    statusBarStyle: "default"
+  },
+  formatDetection: {
+    telephone: false
   },
   robots: {
     index: true,

@@ -303,6 +303,7 @@ export default function AdminPage() {
   );
 }
 
+// Dashboard metrics are derived from existing records; no analytics data is stored separately.
 function AdminOverview({
   bookings,
   listings,
@@ -320,17 +321,47 @@ function AdminOverview({
 }) {
   const activeBookings = bookings.filter((booking) => !booking.deleted_at);
   const today = new Date().toISOString().slice(0, 10);
-  const pending = activeBookings.filter((booking) => ["pending_payment", "payment_submitted"].includes(booking.status));
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+  const thirtyDayStart = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  const listingAgentMap = new Map(
+    listings
+      .filter((listing) => listing.agent_id)
+      .map((listing) => [listing.id, listing.agent_id as string])
+  );
+
+  const effectiveAgentId = (booking: Booking) =>
+    bookingAgents[booking.id] || listingAgentMap.get(booking.listing_id) || null;
+
+  const pending = activeBookings.filter((booking) =>
+    ["pending_payment", "payment_submitted"].includes(booking.status)
+  );
   const confirmed = activeBookings.filter((booking) => booking.status === "confirmed");
   const completed = activeBookings.filter((booking) => booking.status === "tour_completed");
-  const publishedListings = listings.filter((listing) => listing.status === "published" && !listing.is_demo);
-  const activeAds = ads.filter((ad) => ad.status === "active" && new Date(ad.ends_at).getTime() > Date.now());
-  const effectiveAgentId = (booking: Booking) =>
-    bookingAgents[booking.id] || listings.find((listing) => listing.id === booking.listing_id)?.agent_id || null;
+  const cancelled = activeBookings.filter((booking) => booking.status === "cancelled");
+  const publishedListings = listings.filter(
+    (listing) => listing.status === "published" && !listing.is_demo
+  );
+  const activeAds = ads.filter(
+    (ad) => ad.status === "active" && new Date(ad.ends_at).getTime() > Date.now()
+  );
   const unassigned = activeBookings.filter((booking) => !effectiveAgentId(booking));
+  const assigned = activeBookings.length - unassigned.length;
+  const assignmentRate = activeBookings.length
+    ? Math.round((assigned / activeBookings.length) * 100)
+    : 0;
+
   const upcoming = activeBookings
-    .filter((booking) => booking.preferred_date >= today && booking.status !== "cancelled")
-    .sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`))
+    .filter(
+      (booking) =>
+        booking.preferred_date >= today && booking.status !== "cancelled"
+    )
+    .sort((a, b) =>
+      `${a.preferred_date} ${a.preferred_time}`.localeCompare(
+        `${b.preferred_date} ${b.preferred_time}`
+      )
+    )
     .slice(0, 6);
 
   const days = Array.from({ length: 7 }, (_, index) => {
@@ -340,15 +371,66 @@ function AdminOverview({
     return {
       key,
       label: date.toLocaleDateString("en-GH", { weekday: "short" }),
-      count: activeBookings.filter((booking) => booking.created_at.slice(0, 10) === key).length
+      count: activeBookings.filter(
+        (booking) => booking.created_at.slice(0, 10) === key
+      ).length
     };
   });
   const maxCount = Math.max(1, ...days.map((day) => day.count));
 
-  const agentWork = agents.filter((agent) => agent.status === "active").map((agent) => ({
-    ...agent,
-    count: activeBookings.filter((booking) => effectiveAgentId(booking) === agent.id).length
-  })).sort((a, b) => a.count - b.count);
+  const last30Days = activeBookings.filter(
+    (booking) => booking.created_at.slice(0, 10) >= thirtyDayStart
+  );
+  const averageDailyBookings = (last30Days.length / 30).toFixed(1);
+  const confirmationRate = activeBookings.length
+    ? Math.round(((confirmed.length + completed.length) / activeBookings.length) * 100)
+    : 0;
+
+  const statusBreakdown = [
+    { label: "Payment pending", value: activeBookings.filter((b) => b.status === "pending_payment").length },
+    { label: "Payment submitted", value: activeBookings.filter((b) => b.status === "payment_submitted").length },
+    { label: "Confirmed", value: confirmed.length },
+    { label: "Completed", value: completed.length },
+    { label: "Cancelled", value: cancelled.length }
+  ];
+  const statusMax = Math.max(1, ...statusBreakdown.map((item) => item.value));
+
+  const cityCounts = new Map<string, number>();
+  publishedListings.forEach((listing) => {
+    cityCounts.set(listing.city, (cityCounts.get(listing.city) || 0) + 1);
+  });
+  const topCities = Array.from(cityCounts.entries())
+    .map(([city, count]) => ({ city, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const propertyTypeCounts = new Map<string, number>();
+  publishedListings.forEach((listing) => {
+    propertyTypeCounts.set(
+      listing.property_type,
+      (propertyTypeCounts.get(listing.property_type) || 0) + 1
+    );
+  });
+  const propertyTypes = Array.from(propertyTypeCounts.entries())
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const agentWork = agents
+    .filter((agent) => agent.status === "active")
+    .map((agent) => ({
+      ...agent,
+      count: activeBookings.filter(
+        (booking) => effectiveAgentId(booking) === agent.id
+      ).length
+    }))
+    .sort((a, b) => a.count - b.count);
+
+  const expiringAds = activeAds.filter((ad) => {
+    const daysLeft =
+      (new Date(ad.ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return daysLeft <= 3;
+  }).length;
 
   return (
     <div className="admin-overview">
@@ -356,39 +438,152 @@ function AdminOverview({
         <div>
           <div className="eyebrow">Live operations</div>
           <h1>JDFortiHomes control centre</h1>
-          <p className="location">A quick view of bookings, properties, agents and promotions across the platform.</p>
+          <p className="location">
+            A quick view of bookings, properties, agents and promotions across the platform.
+          </p>
         </div>
-        <div className="live-indicator"><span className="live-dot" /> Live · refreshes every 15 seconds{liveUpdatedAt ? ` · ${new Date(liveUpdatedAt).toLocaleTimeString("en-GH")}` : ""}</div>
+        <div className="live-indicator">
+          <span className="live-dot" />
+          Live · refreshes every 15 seconds
+          {liveUpdatedAt
+            ? ` · ${new Date(liveUpdatedAt).toLocaleTimeString("en-GH")}`
+            : ""}
+        </div>
       </div>
 
       <div className="overview-stats">
-        <div className="overview-stat"><small>Active bookings</small><strong>{activeBookings.length}</strong><span>{pending.length} need attention</span></div>
-        <div className="overview-stat"><small>Published properties</small><strong>{publishedListings.length}</strong><span>{listings.length} total listings</span></div>
-        <div className="overview-stat"><small>Active promotions</small><strong>{activeAds.length}</strong><span>{ads.length} total advertisements</span></div>
-        <div className="overview-stat"><small>Active agents</small><strong>{agents.filter((agent) => agent.status === "active").length}</strong><span>{unassigned.length} unassigned bookings</span></div>
+        <div className="overview-stat">
+          <small>Active bookings</small>
+          <strong>{activeBookings.length}</strong>
+          <span>{pending.length} need attention</span>
+        </div>
+        <div className="overview-stat">
+          <small>Published properties</small>
+          <strong>{publishedListings.length}</strong>
+          <span>{listings.length} total listings</span>
+        </div>
+        <div className="overview-stat">
+          <small>Active promotions</small>
+          <strong>{activeAds.length}</strong>
+          <span>{expiringAds} end within 3 days</span>
+        </div>
+        <div className="overview-stat">
+          <small>Agent coverage</small>
+          <strong>{assignmentRate}%</strong>
+          <span>{unassigned.length} active bookings unassigned</span>
+        </div>
       </div>
 
       <div className="overview-grid">
         <section className="panel">
-          <div className="panel-heading"><div><h2>Booking activity</h2><p className="location">New booking requests over the last 7 days.</p></div></div>
+          <div className="panel-heading">
+            <div>
+              <h2>Booking activity</h2>
+              <p className="location">New booking requests over the last 7 days.</p>
+            </div>
+          </div>
           <div className="booking-chart" aria-label="Booking activity for the last seven days">
             {days.map((day) => (
               <div className="chart-column" key={day.key}>
                 <strong>{day.count}</strong>
-                <div className="chart-track"><div className="chart-bar" style={{ height: `${Math.max(8, (day.count / maxCount) * 100)}%` }} /></div>
+                <div className="chart-track">
+                  <div
+                    className="chart-bar"
+                    style={{ height: `${Math.max(8, (day.count / maxCount) * 100)}%` }}
+                  />
+                </div>
                 <small>{day.label}</small>
               </div>
             ))}
           </div>
           <div className="overview-mini-stats">
-            <div><small>Today</small><strong>{activeBookings.filter((booking) => booking.created_at.slice(0, 10) === today).length}</strong></div>
-            <div><small>Confirmed</small><strong>{confirmed.length}</strong></div>
-            <div><small>Completed</small><strong>{completed.length}</strong></div>
+            <div>
+              <small>Today</small>
+              <strong>
+                {activeBookings.filter(
+                  (booking) => booking.created_at.slice(0, 10) === today
+                ).length}
+              </strong>
+            </div>
+            <div>
+              <small>30-day volume</small>
+              <strong>{last30Days.length}</strong>
+            </div>
+            <div>
+              <small>Daily average</small>
+              <strong>{averageDailyBookings}</strong>
+            </div>
           </div>
         </section>
 
         <section className="panel">
-          <div className="panel-heading"><div><h2>Agent workload</h2><p className="location">Agents with fewer assigned bookings appear first.</p></div></div>
+          <div className="panel-heading">
+            <div>
+              <h2>Booking funnel</h2>
+              <p className="location">Current booking status distribution.</p>
+            </div>
+          </div>
+          <div className="analytics-bars">
+            {statusBreakdown.map((item) => (
+              <div className="analytics-bar-row" key={item.label}>
+                <div>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+                <div className="analytics-bar-track">
+                  <div
+                    className="analytics-bar-fill"
+                    style={{ width: `${(item.value / statusMax) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="overview-mini-stats">
+            <div><small>Confirmation rate</small><strong>{confirmationRate}%</strong></div>
+            <div><small>Confirmed</small><strong>{confirmed.length}</strong></div>
+            <div><small>Cancelled</small><strong>{cancelled.length}</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div className="overview-grid">
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Property inventory</h2>
+              <p className="location">Published inventory by city and property type.</p>
+            </div>
+          </div>
+          <div className="inventory-columns">
+            <div>
+              <h3>Top cities</h3>
+              {topCities.map((item) => (
+                <div className="inventory-row" key={item.city}>
+                  <span>{item.city}</span><strong>{item.count}</strong>
+                </div>
+              ))}
+              {!topCities.length ? <div className="empty">No published properties yet.</div> : null}
+            </div>
+            <div>
+              <h3>Property types</h3>
+              {propertyTypes.map((item) => (
+                <div className="inventory-row" key={item.type}>
+                  <span>{item.type}</span><strong>{item.count}</strong>
+                </div>
+              ))}
+              {!propertyTypes.length ? <div className="empty">No property types yet.</div> : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Agent workload</h2>
+              <p className="location">Effective booking assignments, including direct transfers.</p>
+            </div>
+          </div>
           <div className="agent-workload">
             {agentWork.map((item) => (
               <div className="agent-work-row" key={item.id}>
@@ -398,17 +593,34 @@ function AdminOverview({
             ))}
           </div>
           {!agentWork.length ? <div className="empty">No active agents yet.</div> : null}
+          <div className="agent-help">
+            <strong>{assigned} assigned · {unassigned.length} unassigned</strong>
+            <span>Use the Bookings tab to move individual bookings to an agent with available capacity.</span>
+          </div>
         </section>
       </div>
 
       <section className="panel">
-        <div className="panel-heading"><div><h2>Upcoming tours</h2><p className="location">The next bookings that need attention.</p></div></div>
+        <div className="panel-heading">
+          <div>
+            <h2>Upcoming tours</h2>
+            <p className="location">The next bookings that need attention.</p>
+          </div>
+        </div>
         <div className="admin-list">
           {upcoming.map((booking) => {
-            const assignedAgent = agents.find((agent) => agent.id === effectiveAgentId(booking));
+            const assignedAgent = agents.find(
+              (agent) => agent.id === effectiveAgentId(booking)
+            );
             return (
               <div className="admin-list-item" key={booking.id}>
-                <div><strong>{booking.reference}</strong><div>{booking.customer_name} · {booking.listing?.title || "Property"}</div><div className="location">{booking.preferred_date} · {booking.preferred_time} · {assignedAgent ? assignedAgent.full_name : "Unassigned"}</div></div>
+                <div>
+                  <strong>{booking.reference}</strong>
+                  <div>{booking.customer_name} · {booking.listing?.title || "Property"}</div>
+                  <div className="location">
+                    {booking.preferred_date} · {booking.preferred_time} · {assignedAgent ? assignedAgent.full_name : "Unassigned"}
+                  </div>
+                </div>
                 <span className="status">{booking.status.replaceAll("_", " ")}</span>
               </div>
             );
@@ -418,19 +630,50 @@ function AdminOverview({
       </section>
 
       <section className="panel">
-        <div className="panel-heading"><div><h2>Recent activity</h2><p className="location">The latest changes visible to the administrator.</p></div></div>
+        <div className="panel-heading">
+          <div>
+            <h2>Recent activity</h2>
+            <p className="location">The latest records visible to the administrator.</p>
+          </div>
+        </div>
         <div className="activity-list">
           {[
-            ...activeBookings.map((item) => ({ key: `booking-${item.id}`, time: item.created_at, title: `New booking ${item.reference}`, detail: `${item.customer_name} · ${item.listing?.title || "Property"}`, kind: "Booking" })),
-            ...listings.filter((item) => !item.is_demo).map((item) => ({ key: `listing-${item.id}`, time: item.created_at, title: `Listing added: ${item.title}`, detail: `${item.location}, ${item.city}`, kind: "Listing" })),
-            ...ads.map((item) => ({ key: `ad-${item.id}`, time: item.created_at, title: `Advertisement created: ${item.title}`, detail: item.ad_type === "sponsored_property" ? "Sponsored property" : "JDFortiHomes promotion", kind: "Ad" }))
-          ].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 8).map((item) => (
-            <div className="activity-row" key={item.key}>
-              <span className="activity-kind">{item.kind}</span>
-              <div><strong>{item.title}</strong><span>{item.detail}</span></div>
-              <time dateTime={item.time}>{new Date(item.time).toLocaleString("en-GH", { dateStyle: "short", timeStyle: "short" })}</time>
-            </div>
-          ))}
+            ...activeBookings.map((item) => ({
+              key: `booking-${item.id}`,
+              time: item.created_at,
+              title: `New booking ${item.reference}`,
+              detail: `${item.customer_name} · ${item.listing?.title || "Property"}`,
+              kind: "Booking"
+            })),
+            ...listings.filter((item) => !item.is_demo).map((item) => ({
+              key: `listing-${item.id}`,
+              time: item.created_at,
+              title: `Listing added: ${item.title}`,
+              detail: `${item.location}, ${item.city}`,
+              kind: "Listing"
+            })),
+            ...ads.map((item) => ({
+              key: `ad-${item.id}`,
+              time: item.created_at,
+              title: `Advertisement created: ${item.title}`,
+              detail: item.ad_type === "sponsored_property" ? "Sponsored property" : "JDFortiHomes promotion",
+              kind: "Ad"
+            }))
+          ]
+            .sort((a, b) => b.time.localeCompare(a.time))
+            .slice(0, 8)
+            .map((item) => (
+              <div className="activity-row" key={item.key}>
+                <span className="activity-kind">{item.kind}</span>
+                <div><strong>{item.title}</strong><span>{item.detail}</span></div>
+                <time dateTime={item.time}>
+                  {new Date(item.time).toLocaleString("en-GH", {
+                    dateStyle: "short",
+                    timeStyle: "short"
+                  })}
+                </time>
+              </div>
+            ))}
         </div>
       </section>
     </div>

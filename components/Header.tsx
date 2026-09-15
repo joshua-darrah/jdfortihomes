@@ -30,8 +30,8 @@ export function Header() {
             src="/jdfortihomes-mark.png"
             alt=""
             className="brand-mark"
-            width={1550}
-            height={793}
+            width={512}
+            height={512}
           />
           <span className="brand-wordmark" aria-hidden="true">
             <span>JDForti</span><span className="brand-wordmark-home">Homes</span>
