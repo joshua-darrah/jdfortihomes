@@ -12,3 +12,12 @@
 - Added a dedicated 180×180 Apple touch icon.
 - Added responsive viewport metadata, Apple web-app metadata, safe-area CSS and a web manifest.
 - Added project documentation covering architecture, database, admin, agents, analytics, deployment and maintenance.
+
+## Agent fees and booking commission
+
+- Added optional agent-set tour fees per listing.
+- Added admin-configurable default tour fee and JDFortiHomes commission percentage.
+- Added immutable booking fee/commission/payout snapshots.
+- Added automatic pending agent payout creation for agent-fee bookings.
+- Direct booking reassignment now synchronizes pending/approved payout ownership.
+- Payment details remain confined to the booking flow.

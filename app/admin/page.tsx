@@ -920,6 +920,8 @@ function BookingDetails({ booking, onClose }: { booking: Booking; onClose: () =>
           <div className="stat"><small>Preferred time</small><strong>{booking.preferred_time}</strong></div>
           <div className="stat"><small>Payment method</small><strong>{booking.payment_method}</strong></div>
           <div className="stat"><small>Tour fee</small><strong>{formatGhs(Number(booking.tour_fee))}</strong></div>
+          {booking.agent_fee !== null && booking.agent_fee !== undefined ? <div className="stat"><small>JDFortiHomes commission</small><strong>{formatGhs(Number(booking.platform_commission_amount))} ({Number(booking.platform_commission_rate).toFixed(2)}%)</strong></div> : null}
+          {booking.agent_fee !== null && booking.agent_fee !== undefined ? <div className="stat"><small>Agent payout</small><strong>{formatGhs(Number(booking.agent_payout_amount))}</strong></div> : null}
           <div className="stat"><small>Status</small><strong>{booking.status.replaceAll("_", " ")}</strong></div>
           <div className="stat"><small>Submitted</small><strong>{new Date(booking.created_at).toLocaleString("en-GH")}</strong></div>
         </div>
@@ -1245,6 +1247,7 @@ function ListingEditor({
         region: String(form.get("region") || "").trim(),
         address: String(form.get("address") || "").trim() || null,
         monthly_rent: Number(form.get("monthly_rent") || 0),
+        agent_fee: String(form.get("agent_fee") || "").trim() === "" ? null : Number(form.get("agent_fee")),
         bedrooms: Number(form.get("bedrooms") || 0),
         bathrooms: Number(form.get("bathrooms") || 0),
         furnishing: String(form.get("furnishing") || "Unfurnished").trim(),
@@ -1323,6 +1326,7 @@ function ListingEditor({
         <div className="form-group"><label htmlFor="listing-city">City *</label><input className="field" id="listing-city" name="city" defaultValue={listing?.city || "Kumasi"} maxLength={100} required /></div>
         <div className="form-group"><label htmlFor="listing-region">Region *</label><input className="field" id="listing-region" name="region" defaultValue={listing?.region || "Ashanti"} maxLength={100} required /></div>
         <div className="form-group"><label htmlFor="monthly-rent">Monthly rent (GHS) *</label><input className="field" id="monthly-rent" type="number" name="monthly_rent" defaultValue={listing?.monthly_rent || 0} min="0" step="1" required /></div>
+        <div className="form-group"><label htmlFor="agent-fee">Agent tour fee (GHS)</label><input className="field" id="agent-fee" type="number" name="agent_fee" defaultValue={listing?.agent_fee ?? ""} min="0" step="0.01" placeholder="Leave blank for JDFortiHomes default" /><span className="upload-note">Optional. If set, this becomes the tour fee for this property. JDFortiHomes commission is calculated from this amount.</span></div>
         <div className="form-group"><label htmlFor="room-type">Room / unit type *</label><input className="field" id="room-type" name="room_type" defaultValue={listing?.room_type || "Standard room"} maxLength={100} required /></div>
         <div className="form-group"><label htmlFor="bedrooms">Bedrooms / rooms *</label><input className="field" id="bedrooms" type="number" name="bedrooms" defaultValue={listing?.bedrooms || 1} min="0" max="100" required /></div>
         <div className="form-group"><label htmlFor="bathrooms">Bathrooms *</label><input className="field" id="bathrooms" type="number" name="bathrooms" defaultValue={listing?.bathrooms || 1} min="0" max="100" required /></div>
@@ -1945,6 +1949,34 @@ function AgentPanel({
   const [agentEditorOpen, setAgentEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(agents[0]?.id || "");
+  const [defaultTourFee, setDefaultTourFee] = useState("50");
+  const [commissionRate, setCommissionRate] = useState("15");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.from("platform_settings").select("default_tour_fee, agent_commission_rate").eq("id", 1).maybeSingle().then(({ data, error }) => {
+      if (error) { setMessage(error.message); return; }
+      if (data) {
+        setDefaultTourFee(String(data.default_tour_fee));
+        setCommissionRate(String(data.agent_commission_rate));
+      }
+    });
+  }, []);
+
+  async function saveFeeSettings() {
+    if (!supabase || settingsSaving) return;
+    const fee = Number(defaultTourFee);
+    const rate = Number(commissionRate);
+    if (!Number.isFinite(fee) || fee < 0 || !Number.isFinite(rate) || rate < 0 || rate > 100) {
+      setMessage("Enter a valid default tour fee and a commission rate from 0 to 100%.");
+      return;
+    }
+    setSettingsSaving(true);
+    const { error } = await supabase.from("platform_settings").upsert({ id: 1, default_tour_fee: fee, agent_commission_rate: rate });
+    setSettingsSaving(false);
+    setMessage(error ? error.message : "Tour-fee and commission settings saved.");
+  }
 
   async function saveAgent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2066,6 +2098,24 @@ function AgentPanel({
             <div className="admin-actions" style={{ marginTop: 16 }}><button className="button accent" type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Save agent" : "Add agent"}</button><button className="button secondary" type="button" onClick={() => { setAgentEditorOpen(false); setEditing(null); }}>Cancel</button></div>
           </form>
         </AdminEditorModal>
+      </div>
+
+      <div className="panel">
+        <h2>Tour fees and commission</h2>
+        <p className="location">Set the platform default for listings where an agent has not chosen a fee, and set the JDFortiHomes percentage taken from optional agent-set fees.</p>
+        <div className="form-grid" style={{ marginTop: 14 }}>
+          <div className="form-group">
+            <label htmlFor="default-tour-fee">Default tour fee (GHS)</label>
+            <input className="field" id="default-tour-fee" type="number" min="0" step="0.01" value={defaultTourFee} onChange={(event) => setDefaultTourFee(event.target.value)} />
+            <span className="upload-note">Used when a listing does not have an agent-set fee.</span>
+          </div>
+          <div className="form-group">
+            <label htmlFor="commission-rate">JDFortiHomes commission (%)</label>
+            <input className="field" id="commission-rate" type="number" min="0" max="100" step="0.01" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} />
+            <span className="upload-note">Applied only to optional agent-set tour fees. The rate is stored with each booking.</span>
+          </div>
+        </div>
+        <button className="button accent" type="button" onClick={() => void saveFeeSettings()} disabled={settingsSaving} style={{ marginTop: 14 }}>{settingsSaving ? "Saving..." : "Save fee settings"}</button>
       </div>
 
       <div className="panel">

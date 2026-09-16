@@ -76,12 +76,44 @@ export async function POST(request: Request) {
 
     const { data: listing, error: listingError } = await client
       .from("listings")
-      .select("id, status, is_demo, visibility_starts_at, visibility_ends_at")
+      .select("id, status, is_demo, visibility_starts_at, visibility_ends_at, agent_fee")
       .eq("id", listingId)
       .maybeSingle();
 
     if (listingError || !listing || (listing.status !== "published" && !listing.is_demo) || (listing.visibility_starts_at && new Date(listing.visibility_starts_at).getTime() > Date.now()) || (listing.visibility_ends_at && new Date(listing.visibility_ends_at).getTime() <= Date.now())) {
       return NextResponse.json({ error: "The selected property is not currently available for booking." }, { status: 400 });
+    }
+
+    const [{ data: listingAgent }, { data: settings }] = await Promise.all([
+      client
+        .from("listing_agents")
+        .select("agent_id")
+        .eq("listing_id", listingId)
+        .maybeSingle(),
+      client
+        .from("platform_settings")
+        .select("default_tour_fee, agent_commission_rate")
+        .eq("id", 1)
+        .maybeSingle()
+    ]);
+
+    const defaultTourFee = Number(settings?.default_tour_fee ?? siteConfig.tourFeeGhs);
+    const agentFee = listing.agent_fee === null || listing.agent_fee === undefined
+      ? null
+      : Number(listing.agent_fee);
+    if (agentFee !== null && !listingAgent?.agent_id) {
+      return NextResponse.json({ error: "This property has an agent fee configured but no active agent assignment. Please contact JDFortiHomes." }, { status: 500 });
+    }
+
+    const tourFee = agentFee !== null ? agentFee : defaultTourFee;
+    const commissionRate = agentFee !== null ? Number(settings?.agent_commission_rate ?? 15) : 0;
+    const commissionAmount = agentFee !== null ? Number((tourFee * commissionRate / 100).toFixed(2)) : 0;
+    const agentPayoutAmount = agentFee !== null && listingAgent?.agent_id
+      ? Number((tourFee - commissionAmount).toFixed(2))
+      : 0;
+
+    if (!Number.isFinite(tourFee) || tourFee < 0 || (agentFee !== null && (!Number.isFinite(agentFee) || agentFee < 0)) || !Number.isFinite(commissionRate) || commissionRate < 0 || commissionRate > 100) {
+      return NextResponse.json({ error: "The booking fee configuration is invalid. Please contact JDFortiHomes." }, { status: 500 });
     }
 
     const reference = makeBookingReference();
@@ -105,7 +137,11 @@ export async function POST(request: Request) {
       preferred_date: preferredDate,
       preferred_time: preferredTime,
       notes,
-      tour_fee: siteConfig.tourFeeGhs,
+      tour_fee: tourFee,
+      agent_fee: agentFee,
+      platform_commission_rate: commissionRate,
+      platform_commission_amount: commissionAmount,
+      agent_payout_amount: agentPayoutAmount,
       payment_method: paymentMethod,
       payment_proof_path: proofPath,
       terms_accepted: true,

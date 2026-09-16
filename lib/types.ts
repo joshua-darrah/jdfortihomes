@@ -10,6 +10,7 @@ export type Listing = {
   latitude: number | null;
   longitude: number | null;
   monthly_rent: number;
+  agent_fee: number | null;
   bedrooms: number;
   bathrooms: number;
   furnishing: string;
@@ -45,6 +46,10 @@ export type Booking = {
   preferred_time: string;
   notes: string | null;
   tour_fee: number;
+  agent_fee: number | null;
+  platform_commission_rate: number;
+  platform_commission_amount: number;
+  agent_payout_amount: number;
   payment_method: string;
   payment_proof_path: string | null;
   terms_accepted: boolean;

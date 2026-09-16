@@ -7,7 +7,7 @@ import type { Listing } from "@/lib/types";
 
 const MAX_PROOF_SIZE = 5 * 1024 * 1024;
 
-export function BookingForm({ listing }: { listing: Listing }) {
+export function BookingForm({ listing, tourFee }: { listing: Listing; tourFee: number }) {
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState("");
   const [loading, setLoading] = useState(false);
@@ -98,7 +98,7 @@ export function BookingForm({ listing }: { listing: Listing }) {
   return (
     <form className="form-card" onSubmit={handleSubmit} noValidate>
       <div className="notice" role="note">
-        Tour fee: <strong>{siteConfig.tourFeeGhs} GHS</strong>. Payment is currently
+        Tour fee for this property: <strong>{tourFee} GHS</strong>. Payment is currently
         manual. The payment proof is used only to review the tour-fee payment.
       </div>
 

@@ -83,3 +83,11 @@ Then test:
 - advertisement expiry;
 - mobile navigation; and
 - Apple home-screen icon/branding.
+
+## Agent fees and commission migration
+
+For an existing Supabase database, run `supabase/agent-fees-commission.sql` once after the existing agent/booking-assignment migrations. It adds optional per-listing agent fees, platform commission settings, booking financial snapshots, and automatic pending payout records.
+
+The seeded commission rate is 15% as a configurable starting value. Change it from **Admin → Agents → Tour fees and commission** before launch if JDFortiHomes agrees on a different rate.
+
+Manual payment details are still configured through the payment environment variables. They are only rendered inside the `/book` booking flow, not on public property pages or the homepage.

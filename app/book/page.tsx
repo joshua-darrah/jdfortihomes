@@ -17,6 +17,12 @@ async function getListing(id: string): Promise<Listing | null> {
   return data as Listing | null;
 }
 
+async function getTourFee(listing: Listing) {
+  if (!supabase) return listing.agent_fee ?? 50;
+  const { data } = await supabase.rpc("get_public_tour_fee", { listing_record_id: listing.id });
+  return Number(data ?? listing.agent_fee ?? 50);
+}
+
 export default async function BookPage({
   searchParams
 }: {
@@ -27,6 +33,7 @@ export default async function BookPage({
 
   const listing = await getListing(params.listing);
   if (!listing) notFound();
+  const tourFee = await getTourFee(listing);
 
   return (
     <main className="form-page">
@@ -37,7 +44,7 @@ export default async function BookPage({
           You are booking a tour for <strong>{listing.title}</strong> in{" "}
           {listing.location}, {listing.city}.
         </p>
-        <BookingForm listing={listing} />
+        <BookingForm listing={listing} tourFee={tourFee} />
       </div>
     </main>
   );

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { RealtimeListings } from "@/components/RealtimeListings";
-import { siteConfig } from "@/lib/site-config";
 import { supabase } from "@/lib/supabase";
 import type { Listing } from "@/lib/types";
 import { demoListings } from "@/lib/demo-listings";
@@ -81,7 +80,7 @@ export default async function HomePage() {
             <div className="panel"><div className="eyebrow">02</div><h3>View the details</h3><p className="location">See photos, available videos, room information, amenities, pricing and location.</p></div>
             <div className="panel"><div className="eyebrow">03</div><h3>Book a tour</h3><p className="location">Choose a preferred date and time, make the manual tour-fee payment and upload proof.</p></div>
           </div>
-          <div className="notice" style={{ marginTop: 24 }}>Tour fee: <strong>{siteConfig.tourFeeGhs} GHS</strong>.</div>
+          <div className="notice" style={{ marginTop: 24 }}>Tour fees are shown for the selected property during the booking process.</div>
         </div>
       </section>
     </main>

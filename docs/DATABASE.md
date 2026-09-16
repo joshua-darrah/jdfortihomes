@@ -105,3 +105,12 @@ The targeted indexes cover common filters and ordering for:
 - advertisement-to-listing lookup.
 
 Indexes are used selectively because every additional index adds write and storage overhead.
+
+## Agent tour fees and platform commission
+
+- `listings.agent_fee` is optional. When set by an agent, it becomes the tour fee for that property.
+- `platform_settings.default_tour_fee` is the fallback tour fee for listings without an agent-set fee.
+- `platform_settings.agent_commission_rate` is the JDFortiHomes percentage applied to agent-set tour fees. The current seeded default is 15%, and the administrator can change it from the Agents section.
+- Each booking stores a snapshot of `agent_fee`, `platform_commission_rate`, `platform_commission_amount`, and `agent_payout_amount` so later rate changes do not rewrite historical bookings.
+- Agent-set bookings automatically create a pending `agent_payouts` record for the effective agent. Direct booking assignment can move that pending/approved payout to the newly assigned agent.
+- The public `get_public_tour_fee` RPC exposes only the effective fee for a currently published listing. Payment account details remain environment configuration and are rendered only inside the booking flow.
