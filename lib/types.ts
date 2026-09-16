@@ -35,6 +35,23 @@ export type Listing = {
   agent_id?: string | null;
 };
 
+export type BookingItem = {
+  id: string;
+  booking_id: string;
+  listing_id: string;
+  preferred_date: string;
+  preferred_time: string;
+  base_tour_fee: number;
+  discount_rate: number;
+  tour_fee: number;
+  agent_fee: number | null;
+  platform_commission_rate: number;
+  platform_commission_amount: number;
+  agent_payout_amount: number;
+  created_at: string;
+  listing?: Pick<Listing, "title" | "location" | "city">;
+};
+
 export type Booking = {
   id: string;
   reference: string;
@@ -62,6 +79,7 @@ export type Booking = {
   deleted_by: string | null;
   agent_id?: string | null;
   listing?: Pick<Listing, "title" | "location" | "city">;
+  items?: BookingItem[];
 };
 
 
@@ -101,6 +119,8 @@ export type Agent = {
 
 export type AgentPayout = {
   id: string;
+  booking_id: string | null;
+  booking_item_id: string | null;
   agent_id: string;
   listing_id: string | null;
   ad_id: string | null;

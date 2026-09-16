@@ -91,3 +91,10 @@ For an existing Supabase database, run `supabase/agent-fees-commission.sql` once
 The seeded commission rate is 15% as a configurable starting value. Change it from **Admin → Agents → Tour fees and commission** before launch if JDFortiHomes agrees on a different rate.
 
 Manual payment details are still configured through the payment environment variables. They are only rendered inside the `/book` booking flow, not on public property pages or the homepage.
+
+
+## Multi-tour booking migration
+
+For an existing Supabase database, run `supabase/multi-tour-bookings.sql` after `supabase/agent-fees-commission.sql` and the booking-assignment migration. It adds one normalized child table for tours inside a booking, configurable multi-tour discount tiers, public fee/discount lookup functions, and item-level agent payout support.
+
+The initial discount tiers are 0% for one tour, 33.33% for two tours, 46.67% for three tours, and 50% for four or more tours. These can be changed from **Admin → Agents → Tour fees and commission**.

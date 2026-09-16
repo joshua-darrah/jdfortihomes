@@ -89,7 +89,9 @@ Use the focused migrations when upgrading an older installation:
 2. `supabase/agent-access.sql`
 3. `supabase/video-media.sql`
 4. `supabase/booking-agent-assignment.sql`
-5. `supabase/performance-indexes.sql`
+5. `supabase/agent-fees-commission.sql`
+6. `supabase/multi-tour-bookings.sql`
+7. `supabase/performance-indexes.sql`
 
 For `agent-access.sql`, run the `ALTER TYPE` statement separately first and allow it to commit before running the remainder of that migration. PostgreSQL does not permit a newly added enum value to be used in the same transaction that adds it.
 

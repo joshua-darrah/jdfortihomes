@@ -32,7 +32,6 @@ export default function AdminPage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [showDeletedBookings, setShowDeletedBookings] = useState(false);
   const [bookingAgents, setBookingAgents] = useState<Record<string, string>>({});
-  const [liveUpdatedAt, setLiveUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -109,7 +108,7 @@ export default function AdminPage() {
       supabase.from("listings").select("*").order("created_at", { ascending: false }),
       supabase
         .from("bookings")
-        .select("*, listing:listings(title, location, city)")
+        .select("*, listing:listings(title, location, city), items:booking_items(*, listing:listings(title, location, city))")
         .order("created_at", { ascending: false }),
       supabase.from("ads").select("*").order("created_at", { ascending: false }),
       supabase.from("agents").select("*").order("created_at", { ascending: false }),
@@ -141,15 +140,12 @@ export default function AdminPage() {
       setBookingAgents(Object.fromEntries((bookingAgentResult.data || []).map((row: any) => [row.booking_id, row.agent_id])));
     }
     if (payoutResult.data) setAgentPayouts(payoutResult.data as AgentPayout[]);
-    setLiveUpdatedAt(new Date().toISOString());
     setDataLoading(false);
   }
 
   useEffect(() => {
     if (role !== "admin") return;
     void loadData();
-    const timer = window.setInterval(() => void loadData(), 15000);
-    return () => window.clearInterval(timer);
   }, [role]);
 
   if (!supabaseConfigured) {
@@ -244,7 +240,7 @@ export default function AdminPage() {
         {dataLoading ? <AdminSkeleton /> : null}
 
         {!dataLoading && tab === "overview" ? (
-          <AdminOverview bookings={bookings} listings={listings} ads={ads} agents={agents} bookingAgents={bookingAgents} liveUpdatedAt={liveUpdatedAt} />
+          <AdminOverview bookings={bookings} listings={listings} ads={ads} agents={agents} bookingAgents={bookingAgents} />
         ) : null}
 
         {!dataLoading && tab === "bookings" ? (
@@ -309,15 +305,13 @@ function AdminOverview({
   listings,
   ads,
   agents,
-  bookingAgents,
-  liveUpdatedAt
+  bookingAgents
 }: {
   bookings: Booking[];
   listings: Listing[];
   ads: Ad[];
   agents: Agent[];
   bookingAgents: Record<string, string>;
-  liveUpdatedAt: string | null;
 }) {
   const activeBookings = bookings.filter((booking) => !booking.deleted_at);
   const today = new Date().toISOString().slice(0, 10);
@@ -444,10 +438,7 @@ function AdminOverview({
         </div>
         <div className="live-indicator">
           <span className="live-dot" />
-          Live · refreshes every 15 seconds
-          {liveUpdatedAt
-            ? ` · ${new Date(liveUpdatedAt).toLocaleTimeString("en-GH")}`
-            : ""}
+          Analytics from the current database snapshot
         </div>
       </div>
 
@@ -753,7 +744,23 @@ function BookingPanel({
               <tr key={booking.id}>
                 <td><strong>{booking.reference}</strong>{booking.deleted_at ? <div className="location">Deleted</div> : null}</td>
                 <td>{booking.customer_name}<br />{booking.customer_phone}<br />{booking.customer_email}</td>
-                <td>{booking.listing?.title}<br /><span className="location">{booking.listing?.location}</span><br /><span className="location">Agent: {agents.find((agent) => agent.id === getAssignedAgentId(booking))?.full_name || "Unassigned"}</span></td>
+                <td>
+                  {booking.items?.length ? (
+                    <>
+                      <strong>{booking.items.length} properties</strong>
+                      {booking.items.slice(0, 2).map((item) => (
+                        <div className="location" key={item.id}>{item.listing?.title || "Property"}</div>
+                      ))}
+                      {booking.items.length > 2 ? <div className="location">+ {booking.items.length - 2} more</div> : null}
+                    </>
+                  ) : (
+                    <>
+                      {booking.listing?.title}<br />
+                      <span className="location">{booking.listing?.location}</span>
+                    </>
+                  )}
+                  <div className="location">Agent: {agents.find((agent) => agent.id === getAssignedAgentId(booking))?.full_name || "Property assignments"}</div>
+                </td>
                 <td>{booking.preferred_date}<br />{booking.preferred_time}</td>
                 <td>{formatGhs(Number(booking.tour_fee))}<br /><span className="location">{booking.payment_method}</span></td>
                 <td>
@@ -933,6 +940,26 @@ function BookingDetails({ booking, onClose }: { booking: Booking; onClose: () =>
 
         <div className="booking-detail-section">
           <h3>Payment proof</h3>
+          {booking.items?.length ? (
+            <div className="panel" style={{ marginTop: 18, padding: 16 }}>
+              <h3 style={{ marginTop: 0 }}>Tours in this booking</h3>
+              <div className="selected-tour-list">
+                {booking.items.map((item) => (
+                  <div className="selected-tour" key={item.id}>
+                    <div>
+                      <strong>{item.listing?.title || "Property"}</strong>
+                      <span>{item.listing?.location}, {item.listing?.city} · {item.preferred_date} · {item.preferred_time}</span>
+                    </div>
+                    <div>
+                      <strong>{formatGhs(Number(item.tour_fee))}</strong>
+                      <span>{Number(item.discount_rate).toFixed(2)}% discount</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {!booking.payment_proof_path ? <p className="location">No payment proof was uploaded.</p> : null}
           {loadingProof ? <div className="skeleton skeleton-proof" aria-label="Loading payment proof" /> : null}
           {proofError ? <div className="notice error" role="alert">Could not open the payment proof: {proofError}</div> : null}
@@ -1952,15 +1979,34 @@ function AgentPanel({
   const [defaultTourFee, setDefaultTourFee] = useState("50");
   const [commissionRate, setCommissionRate] = useState("15");
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [discountRates, setDiscountRates] = useState({ one: "0", two: "33.33", three: "46.67", four: "50" });
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.from("platform_settings").select("default_tour_fee, agent_commission_rate").eq("id", 1).maybeSingle().then(({ data, error }) => {
-      if (error) { setMessage(error.message); return; }
-      if (data) {
-        setDefaultTourFee(String(data.default_tour_fee));
-        setCommissionRate(String(data.agent_commission_rate));
+    Promise.all([
+      supabase.from("platform_settings").select("default_tour_fee, agent_commission_rate").eq("id", 1).maybeSingle(),
+      supabase.from("tour_fee_discounts").select("min_tours, discount_rate").order("min_tours", { ascending: true })
+    ]).then(([settingsResult, discountResult]) => {
+      if (settingsResult.error) {
+        setMessage(settingsResult.error.message);
+        return;
       }
+      if (settingsResult.data) {
+        setDefaultTourFee(String(settingsResult.data.default_tour_fee));
+        setCommissionRate(String(settingsResult.data.agent_commission_rate));
+      }
+      if (discountResult.error) {
+        setMessage(discountResult.error.message);
+        return;
+      }
+      const next = { one: "0", two: "33.33", three: "46.67", four: "50" };
+      (discountResult.data || []).forEach((row: { min_tours: number; discount_rate: number }) => {
+        if (row.min_tours === 1) next.one = String(row.discount_rate);
+        if (row.min_tours === 2) next.two = String(row.discount_rate);
+        if (row.min_tours === 3) next.three = String(row.discount_rate);
+        if (row.min_tours === 4) next.four = String(row.discount_rate);
+      });
+      setDiscountRates(next);
     });
   }, []);
 
@@ -1968,14 +2014,23 @@ function AgentPanel({
     if (!supabase || settingsSaving) return;
     const fee = Number(defaultTourFee);
     const rate = Number(commissionRate);
-    if (!Number.isFinite(fee) || fee < 0 || !Number.isFinite(rate) || rate < 0 || rate > 100) {
-      setMessage("Enter a valid default tour fee and a commission rate from 0 to 100%.");
+    const discounts = [
+      { min_tours: 1, value: Number(discountRates.one) },
+      { min_tours: 2, value: Number(discountRates.two) },
+      { min_tours: 3, value: Number(discountRates.three) },
+      { min_tours: 4, value: Number(discountRates.four) }
+    ];
+    if (!Number.isFinite(fee) || fee < 0 || !Number.isFinite(rate) || rate < 0 || rate > 100 || discounts.some((item) => !Number.isFinite(item.value) || item.value < 0 || item.value > 100)) {
+      setMessage("Enter valid fee, commission and discount percentages from 0 to 100%.");
       return;
     }
     setSettingsSaving(true);
-    const { error } = await supabase.from("platform_settings").upsert({ id: 1, default_tour_fee: fee, agent_commission_rate: rate });
+    const [{ error: settingsError }, { error: discountError }] = await Promise.all([
+      supabase.from("platform_settings").upsert({ id: 1, default_tour_fee: fee, agent_commission_rate: rate }),
+      supabase.from("tour_fee_discounts").upsert(discounts.map((item) => ({ min_tours: item.min_tours, discount_rate: item.value })), { onConflict: "min_tours" })
+    ]);
     setSettingsSaving(false);
-    setMessage(error ? error.message : "Tour-fee and commission settings saved.");
+    setMessage(settingsError?.message || discountError?.message || "Tour-fee, commission and multi-tour discount settings saved.");
   }
 
   async function saveAgent(event: FormEvent<HTMLFormElement>) {
@@ -2115,6 +2170,16 @@ function AgentPanel({
             <span className="upload-note">Applied only to optional agent-set tour fees. The rate is stored with each booking.</span>
           </div>
         </div>
+        <div className="form-group" style={{ marginTop: 18 }}>
+          <h3 style={{ margin: "0 0 6px" }}>Multi-tour discounts</h3>
+          <p className="location">These percentages apply to every selected tour when the customer books them together. The 4-tour rate also applies to 4 or more tours.</p>
+        </div>
+        <div className="form-grid" style={{ marginTop: 12 }}>
+          <div className="form-group"><label htmlFor="discount-one">1 tour (%)</label><input className="field" id="discount-one" type="number" min="0" max="100" step="0.01" value={discountRates.one} onChange={(event) => setDiscountRates((current) => ({ ...current, one: event.target.value }))} /></div>
+          <div className="form-group"><label htmlFor="discount-two">2 tours (%)</label><input className="field" id="discount-two" type="number" min="0" max="100" step="0.01" value={discountRates.two} onChange={(event) => setDiscountRates((current) => ({ ...current, two: event.target.value }))} /></div>
+          <div className="form-group"><label htmlFor="discount-three">3 tours (%)</label><input className="field" id="discount-three" type="number" min="0" max="100" step="0.01" value={discountRates.three} onChange={(event) => setDiscountRates((current) => ({ ...current, three: event.target.value }))} /></div>
+          <div className="form-group"><label htmlFor="discount-four">4+ tours (%)</label><input className="field" id="discount-four" type="number" min="0" max="100" step="0.01" value={discountRates.four} onChange={(event) => setDiscountRates((current) => ({ ...current, four: event.target.value }))} /></div>
+        </div>
         <button className="button accent" type="button" onClick={() => void saveFeeSettings()} disabled={settingsSaving} style={{ marginTop: 14 }}>{settingsSaving ? "Saving..." : "Save fee settings"}</button>
       </div>
 
@@ -2146,13 +2211,14 @@ function AgentPanel({
 }
 
 function exportBookings(bookings: Booking[]) {
-  const headers = ["Reference", "Customer", "Phone", "Email", "Property", "Date", "Time", "Fee", "Payment method", "Notes", "Status"];
+  const headers = ["Reference", "Customer", "Phone", "Email", "Properties", "Tours", "Date", "Time", "Fee", "Payment method", "Notes", "Status"];
   const rows = bookings.map((item) => [
     item.reference,
     item.customer_name,
     item.customer_phone,
     item.customer_email,
-    item.listing?.title || "",
+    item.items?.map((tour) => tour.listing?.title || tour.listing_id).join(" | ") || item.listing?.title || "",
+    item.items?.length || 1,
     item.preferred_date,
     item.preferred_time,
     item.tour_fee,
